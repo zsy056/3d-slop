@@ -21,12 +21,12 @@ jobs:
             configure_args: -DOPENSCAD_USE_XVFB=ON
           - name: Windows artifacts
             os: windows-latest
-            target: artifacts
+            target: stl
             configure_args: -DOPENSCAD_EXECUTABLE="C:/Program Files/OpenSCAD/openscad.com" -DOPENSCAD_BUILD_IMAGES=OFF
           - name: macOS artifacts
             os: macos-latest
-            target: artifacts
-            configure_args: ""
+            target: stl
+            configure_args: -DOPENSCAD_BUILD_IMAGES=OFF
 
     steps:
       - name: Check out repository
