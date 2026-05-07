@@ -1,0 +1,40 @@
+{
+  "parameterSets": {
+    "cake-4x-half-scalloped": {
+      "Cake_diameter_studs": "4",
+      "Cake_height_factor": "0.5",
+      "Cake_radius_extra": "2.0",
+      "Side_pattern": "4",
+      "Side_pattern_count": "18",
+      "Side_pattern_rows": "2",
+      "Side_pattern_depth": "0.45",
+      "Side_pattern_size": "1.2",
+      "Top_studs": "1",
+      "Bottom_compatible": "1",
+      "Partial_stud_reliefs": "1",
+      "Bottom_reinforcement_walls": "1",
+      "curve_detail": "48",
+      "corner_detail": "12"
+    },
+    "cake-6x-tall-wavy": {
+      "Cake_diameter_studs": "6",
+      "Cake_height_factor": "1",
+      "Cake_radius_extra": "2.0",
+      "Side_pattern": "7",
+      "Side_pattern_count": "24",
+      "Side_pattern_rows": "3",
+      "Side_pattern_depth": "0.45",
+      "Side_pattern_size": "1.1",
+      "Side_wave_cycles": "4",
+      "Side_wave_amplitude": "1.2",
+      "Side_wave_samples": "48",
+      "Top_studs": "1",
+      "Bottom_compatible": "1",
+      "Partial_stud_reliefs": "1",
+      "Bottom_reinforcement_walls": "1",
+      "curve_detail": "48",
+      "corner_detail": "12"
+    }
+  },
+  "fileFormatVersion": "1"
+}

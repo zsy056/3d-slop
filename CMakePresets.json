@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default artifact build",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "ARTIFACT_DIR": "${sourceDir}/dist"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "targets": [
+        "artifacts"
+      ]
+    },
+    {
+      "name": "stl",
+      "configurePreset": "default",
+      "targets": [
+        "stl"
+      ]
+    },
+    {
+      "name": "images",
+      "configurePreset": "default",
+      "targets": [
+        "images"
+      ]
+    },
+    {
+      "name": "pages",
+      "configurePreset": "default",
+      "targets": [
+        "pages"
+      ]
+    }
+  ]
+}

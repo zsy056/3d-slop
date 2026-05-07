@@ -1,0 +1,38 @@
+{
+  "parameterSets": {
+    "brick-1x2-half": {
+      "X_size": "1",
+      "Y_size": "2",
+      "Height_factor": "0.5",
+      "Type": "0",
+      "Sparse_bottom": "0",
+      "Studs": "3",
+      "Extended_Ridges": "0",
+      "curve_detail": "60",
+      "corner_detail": "16"
+    },
+    "brick-2x4-standard": {
+      "X_size": "2",
+      "Y_size": "4",
+      "Height_factor": "1",
+      "Type": "0",
+      "Sparse_bottom": "0",
+      "Studs": "3",
+      "Extended_Ridges": "0",
+      "curve_detail": "60",
+      "corner_detail": "16"
+    },
+    "baseplate-4x4": {
+      "X_size": "4",
+      "Y_size": "4",
+      "Height_factor": "0.5",
+      "Type": "1",
+      "Sparse_bottom": "1",
+      "Studs": "3",
+      "Extended_Ridges": "0",
+      "curve_detail": "60",
+      "corner_detail": "16"
+    }
+  },
+  "fileFormatVersion": "1"
+}

@@ -1,0 +1,15 @@
+/build*/
+/dist/
+/.cmake/
+
+# CMake generator output, in case someone configures in the source tree.
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/build.ninja
+/.ninja_deps
+/.ninja_log
+
+# OpenSCAD dependency/intermediate files.
+*.deps
+*.d

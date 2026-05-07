@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>3D Slop Model Heap</title>
+    <link rel="stylesheet" href="./assets/styles.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Artifact showroom</p>
+        <h1>3D Slop</h1>
+      </div>
+      <p class="header-copy">Parametric models, rendered previews, and a browser STL viewer. The mess has a loading spinner now.</p>
+    </header>
+
+    <main class="layout">
+      <section class="browser-panel" aria-label="Model collection browser">
+        <div class="panel-heading">
+          <p class="eyebrow">Collections</p>
+          <h2>Pick a specimen</h2>
+        </div>
+        <div id="collectionList" class="collection-list"></div>
+      </section>
+
+      <section class="viewer-panel" aria-label="STL inspection viewer">
+        <div class="viewer-toolbar">
+          <div>
+            <p id="activeCollection" class="eyebrow">Loading</p>
+            <h2 id="activeTitle">Preparing the pile</h2>
+          </div>
+          <div class="toolbar-actions">
+            <button id="spinButton" type="button" aria-pressed="true">Spin</button>
+            <button id="wireButton" type="button" aria-pressed="false">Edges</button>
+            <button id="resetButton" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div class="viewer-shell">
+          <canvas id="viewerCanvas" aria-label="Interactive STL preview"></canvas>
+          <div id="viewerStatus" class="viewer-status">Convincing triangles to cooperate...</div>
+        </div>
+
+        <div class="details-grid">
+          <div class="details-block">
+            <p class="eyebrow">Preset</p>
+            <p id="activeSubtitle">Waiting for geometry.</p>
+          </div>
+          <div class="details-block">
+            <p class="eyebrow">Source</p>
+            <p id="activeSource">-</p>
+          </div>
+          <div class="details-block">
+            <p class="eyebrow">Dimensions</p>
+            <p id="activeDimensions">-</p>
+          </div>
+          <div class="details-block">
+            <p class="eyebrow">Triangles</p>
+            <p id="activeTriangles">-</p>
+          </div>
+        </div>
+
+        <div class="download-row">
+          <a id="downloadLink" href="#" download>Download STL</a>
+          <span>One click closer to asking your slicer what it thinks.</span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

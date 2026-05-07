@@ -1,0 +1,96 @@
+name: Build artifacts
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu artifacts
+            os: ubuntu-latest
+            target: artifacts
+            configure_args: -DOPENSCAD_USE_XVFB=ON
+          - name: Windows artifacts
+            os: windows-latest
+            target: artifacts
+            configure_args: -DOPENSCAD_EXECUTABLE="C:/Program Files/OpenSCAD/openscad.com"
+          - name: macOS artifacts
+            os: macos-latest
+            target: artifacts
+            configure_args: -DOPENSCAD_EXECUTABLE=/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install artifact tools on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build openscad xvfb
+
+      - name: Install artifact tools on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install ninja openscad --no-progress -y
+
+      - name: Install artifact tools on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install ninja
+          brew install --cask openscad
+
+      - name: Configure
+        run: cmake --preset default ${{ matrix.configure_args }}
+
+      - name: Build ${{ matrix.target }}
+        run: cmake --build --preset ${{ matrix.target }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: models-${{ runner.os }}-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+
+      - name: Build Pages site
+        if: runner.os == 'Linux'
+        run: cmake --build --preset pages
+
+      - name: Configure Pages
+        if: runner.os == 'Linux' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: runner.os == 'Linux' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/default/pages
+
+  deploy:
+    name: Deploy Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
