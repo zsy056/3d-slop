@@ -26,7 +26,7 @@ jobs:
           - name: macOS artifacts
             os: macos-latest
             target: artifacts
-            configure_args: -DOPENSCAD_EXECUTABLE=/Applications/OpenSCAD.app/Contents/MacOS/OpenSCAD
+            configure_args: ""
 
     steps:
       - name: Check out repository
@@ -49,6 +49,23 @@ jobs:
         run: |
           brew install ninja
           brew install --cask openscad
+          OPENSCAD_PATH="$(command -v openscad || true)"
+          if [ -z "$OPENSCAD_PATH" ]; then
+            OPENSCAD_PATH="$(
+              find /Applications /opt/homebrew/Caskroom /usr/local/Caskroom \
+                -path '*/OpenSCAD*.app/Contents/MacOS/*' \
+                -type f \
+                -print \
+                -quit 2>/dev/null || true
+            )"
+          fi
+          if [ -z "$OPENSCAD_PATH" ]; then
+            echo "OpenSCAD executable not found after Homebrew install." >&2
+            find /Applications /opt/homebrew/Caskroom /usr/local/Caskroom -iname '*openscad*' -print 2>/dev/null || true
+            exit 1
+          fi
+          echo "OPENSCAD_EXECUTABLE=$OPENSCAD_PATH" >> "$GITHUB_ENV"
+          echo "OpenSCAD executable: $OPENSCAD_PATH"
 
       - name: Configure
         run: cmake --preset default ${{ matrix.configure_args }}

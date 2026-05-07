@@ -5,6 +5,16 @@ option(OPENSCAD_RENDER_IMAGES "Use full CGAL render for PNG exports" ON)
 option(OPENSCAD_HARDWARNINGS "Treat OpenSCAD warnings as errors" OFF)
 option(OPENSCAD_USE_XVFB "Run OpenSCAD through xvfb-run, useful for headless Linux PNG exports" OFF)
 
+if(DEFINED ENV{OPENSCAD_EXECUTABLE} AND NOT "$ENV{OPENSCAD_EXECUTABLE}" STREQUAL "")
+    set(
+        OPENSCAD_EXECUTABLE
+        "$ENV{OPENSCAD_EXECUTABLE}"
+        CACHE FILEPATH
+        "Path to the OpenSCAD command-line executable"
+        FORCE
+    )
+endif()
+
 find_program(
     OPENSCAD_EXECUTABLE
     NAMES openscad openscad.com openscad.exe OpenSCAD
@@ -14,6 +24,10 @@ find_program(
     DOC "Path to the OpenSCAD command-line executable"
     REQUIRED
 )
+
+if(NOT EXISTS "${OPENSCAD_EXECUTABLE}")
+    message(FATAL_ERROR "OpenSCAD executable does not exist: ${OPENSCAD_EXECUTABLE}")
+endif()
 
 set(OPENSCAD_COMMAND "${OPENSCAD_EXECUTABLE}")
 if(OPENSCAD_USE_XVFB)
