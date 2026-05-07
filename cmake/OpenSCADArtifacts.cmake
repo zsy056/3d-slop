@@ -1,6 +1,7 @@
 set(ARTIFACT_DIR "${CMAKE_SOURCE_DIR}/dist" CACHE PATH "Directory for generated STL and image artifacts")
 set(OPENSCAD_IMAGE_SIZE "1200,900" CACHE STRING "Rendered PNG size as width,height")
 set(OPENSCAD_CAMERA "0,0,0,60,0,45,140" CACHE STRING "OpenSCAD camera as translate_x,y,z,rot_x,y,z,dist")
+option(OPENSCAD_BUILD_IMAGES "Build rendered PNG image artifacts" ON)
 option(OPENSCAD_RENDER_IMAGES "Use full CGAL render for PNG exports" ON)
 option(OPENSCAD_HARDWARNINGS "Treat OpenSCAD warnings as errors" OFF)
 option(OPENSCAD_USE_XVFB "Run OpenSCAD through xvfb-run, useful for headless Linux PNG exports" OFF)
@@ -114,10 +115,13 @@ function(add_openscad_model MODEL_FILE PRESET_FILE)
         )
 
         add_custom_target("${MODEL_NAME}.${PRESET}.stl" DEPENDS "${STL_OUTPUT}")
-        add_custom_target("${MODEL_NAME}.${PRESET}.png" DEPENDS "${IMAGE_OUTPUT}")
 
         set_property(GLOBAL APPEND PROPERTY OPENSCAD_STL_OUTPUTS "${STL_OUTPUT}")
-        set_property(GLOBAL APPEND PROPERTY OPENSCAD_IMAGE_OUTPUTS "${IMAGE_OUTPUT}")
+
+        if(OPENSCAD_BUILD_IMAGES)
+            add_custom_target("${MODEL_NAME}.${PRESET}.png" DEPENDS "${IMAGE_OUTPUT}")
+            set_property(GLOBAL APPEND PROPERTY OPENSCAD_IMAGE_OUTPUTS "${IMAGE_OUTPUT}")
+        endif()
     endforeach()
 endfunction()
 
@@ -145,6 +149,7 @@ function(add_openscad_artifact_targets)
 
     message(STATUS "OpenSCAD executable: ${OPENSCAD_EXECUTABLE}")
     message(STATUS "Artifact directory: ${ARTIFACT_DIR}")
+    message(STATUS "Build image artifacts: ${OPENSCAD_BUILD_IMAGES}")
 endfunction()
 
 function(add_pages_site SITE_SOURCE_DIR)

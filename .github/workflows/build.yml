@@ -22,7 +22,7 @@ jobs:
           - name: Windows artifacts
             os: windows-latest
             target: artifacts
-            configure_args: -DOPENSCAD_EXECUTABLE="C:/Program Files/OpenSCAD/openscad.com"
+            configure_args: -DOPENSCAD_EXECUTABLE="C:/Program Files/OpenSCAD/openscad.com" -DOPENSCAD_BUILD_IMAGES=OFF
           - name: macOS artifacts
             os: macos-latest
             target: artifacts
