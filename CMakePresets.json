@@ -25,6 +25,13 @@
       ]
     },
     {
+      "name": "artifacts",
+      "configurePreset": "default",
+      "targets": [
+        "artifacts"
+      ]
+    },
+    {
       "name": "stl",
       "configurePreset": "default",
       "targets": [
