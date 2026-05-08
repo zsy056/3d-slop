@@ -1,6 +1,7 @@
 /build*/
 /dist/
 /.cmake/
+/site/catalog.json
 
 # CMake generator output, in case someone configures in the source tree.
 /CMakeCache.txt

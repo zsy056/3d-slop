@@ -71,7 +71,7 @@ jobs:
         run: cmake --preset default ${{ matrix.configure_args }}
 
       - name: Build ${{ matrix.target }}
-        run: cmake --build --preset ${{ matrix.target }}
+        run: cmake --build --preset ${{ matrix.target }} --parallel
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -82,7 +82,7 @@ jobs:
 
       - name: Build Pages site
         if: runner.os == 'Linux'
-        run: cmake --build --preset pages
+        run: cmake --build --preset pages --parallel
 
       - name: Configure Pages
         if: runner.os == 'Linux' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

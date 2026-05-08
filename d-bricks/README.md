@@ -1,6 +1,6 @@
-# Dbricks
+# D-Bricks
 
-This collection contains Dbricks-compatible OpenSCAD model generators: brick-like solids for when ordinary blocks are too legally and emotionally complicated.
+This collection contains D-Bricks-compatible OpenSCAD model generators: brick-like solids for when ordinary blocks are too legally and emotionally complicated.
 
 ## Credits
 
@@ -35,7 +35,8 @@ baseplate-4x4
 Current cake presets, because apparently the brick ecosystem needed dessert:
 
 ```text
-cake-4x-half-scalloped
+cake-1x-half-plain
+cake-4x-scalloped
 cake-6x-tall-wavy
 ```
 
@@ -60,4 +61,4 @@ openscad -o dist/images/dbricks_generator_v4.brick-1x2-half.png \
   d-bricks/dbricks_generator_v4.scad
 ```
 
-When adding a new preset, add it to the model's `.presets.json` file and to the matching `add_openscad_model()` preset list in this directory's `CMakeLists.txt`. Otherwise it exists only in spirit, which is not a supported export format.
+When adding a new preset, add it to the model's `.presets.json` file. Put showroom copy directly inside that preset as `Slop_catalog_name` and `Slop_catalog_description`, because duplicating preset IDs in a side table is how tomorrow's build learns sarcasm the hard way.

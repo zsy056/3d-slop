@@ -9,7 +9,9 @@
       "Studs": "3",
       "Extended_Ridges": "0",
       "curve_detail": "60",
-      "corner_detail": "16"
+      "corner_detail": "16",
+      "Slop_catalog_name": "1x2 Half Brick",
+      "Slop_catalog_description": "Small, practical, already judging your layer height."
     },
     "brick-2x4-standard": {
       "X_size": "2",
@@ -20,7 +22,9 @@
       "Studs": "3",
       "Extended_Ridges": "0",
       "curve_detail": "60",
-      "corner_detail": "16"
+      "corner_detail": "16",
+      "Slop_catalog_name": "2x4 Standard Brick",
+      "Slop_catalog_description": "A classic rectangle, now with fewer licensing problems and more build logs."
     },
     "baseplate-4x4": {
       "X_size": "4",
@@ -31,7 +35,22 @@
       "Studs": "3",
       "Extended_Ridges": "0",
       "curve_detail": "60",
-      "corner_detail": "16"
+      "corner_detail": "16",
+      "Slop_catalog_name": "4x4 Baseplate",
+      "Slop_catalog_description": "A small foundation for big plans and medium regrets."
+    }
+  },
+  "x-3d-slop": {
+    "collection": {
+      "id": "d-bricks",
+      "name": "D-Bricks",
+      "tagline": "Brick-adjacent solids for tiny construction ambitions and large attribution responsibilities."
+    },
+    "model": {
+      "id": "dbricks-generator-v4",
+      "name": "D-Bricks Generator v4",
+      "source": "d-bricks/dbricks_generator_v4.scad",
+      "description": "The square-ish workhorse: bricks, plates, studs, and the sort of underside geometry that says someone cared a dangerous amount."
     }
   },
   "fileFormatVersion": "1"

@@ -1,8 +1,23 @@
 {
   "parameterSets": {
-    "cake-4x-half-scalloped": {
-      "Cake_diameter_studs": "4",
+    "cake-1x-half-plain": {
+      "Cake_diameter_studs": "1",
       "Cake_height_factor": "0.5",
+      "Cake_radius_extra": "1.0",
+      "Side_pattern": "0",
+      "Top_studs": "1",
+      "Bottom_compatible": "1",
+      "Partial_stud_reliefs": "1",
+      "Edge_partial_tubes": "1",
+      "short_wall_stud_height": "4.6",
+      "curve_detail": "48",
+      "corner_detail": "12",
+      "Slop_catalog_name": "1x Half Plain Cake",
+      "Slop_catalog_description": "A tiny cake puck with short wall studs underneath. Minimal frosting, maximum audacity."
+    },
+    "cake-4x-scalloped": {
+      "Cake_diameter_studs": "4",
+      "Cake_height_factor": "1",
       "Cake_radius_extra": "2.0",
       "Side_pattern": "4",
       "Side_pattern_count": "18",
@@ -12,13 +27,15 @@
       "Top_studs": "1",
       "Bottom_compatible": "1",
       "Partial_stud_reliefs": "1",
-      "Bottom_reinforcement_walls": "1",
+      "Edge_partial_tubes": "1",
       "curve_detail": "48",
-      "corner_detail": "12"
+      "corner_detail": "12",
+      "Slop_catalog_name": "4x Scalloped Cake",
+      "Slop_catalog_description": "Compact celebration puck. Surprisingly serious underside."
     },
     "cake-6x-tall-wavy": {
       "Cake_diameter_studs": "6",
-      "Cake_height_factor": "1",
+      "Cake_height_factor": "1.5",
       "Cake_radius_extra": "2.0",
       "Side_pattern": "7",
       "Side_pattern_count": "24",
@@ -31,9 +48,24 @@
       "Top_studs": "1",
       "Bottom_compatible": "1",
       "Partial_stud_reliefs": "1",
-      "Bottom_reinforcement_walls": "1",
+      "Edge_partial_tubes": "1",
       "curve_detail": "48",
-      "corner_detail": "12"
+      "corner_detail": "12",
+      "Slop_catalog_name": "6x Tall Wavy Cake",
+      "Slop_catalog_description": "More cake. More wave. More time for OpenSCAD to contemplate existence."
+    }
+  },
+  "x-3d-slop": {
+    "collection": {
+      "id": "d-bricks",
+      "name": "D-Bricks",
+      "tagline": "Brick-adjacent solids for tiny construction ambitions and large attribution responsibilities."
+    },
+    "model": {
+      "id": "dbricks-cake-generator",
+      "name": "D-Bricks Cake Generator",
+      "source": "d-bricks/dbricks_cake_generator.scad",
+      "description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry."
     }
   },
   "fileFormatVersion": "1"

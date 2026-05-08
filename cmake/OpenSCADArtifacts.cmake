@@ -60,10 +60,6 @@ define_property(GLOBAL PROPERTY OPENSCAD_IMAGE_OUTPUTS)
 
 function(add_openscad_model MODEL_FILE PRESET_FILE)
     cmake_parse_arguments(ARG "" "" "PRESETS" ${ARGN})
-    if(NOT ARG_PRESETS)
-        message(FATAL_ERROR "add_openscad_model(${MODEL_FILE}) needs at least one PRESETS entry")
-    endif()
-
     get_filename_component(MODEL_PATH "${MODEL_FILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     get_filename_component(PRESET_PATH "${PRESET_FILE}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
     get_filename_component(MODEL_NAME "${MODEL_PATH}" NAME_WE)
@@ -74,6 +70,21 @@ function(add_openscad_model MODEL_FILE PRESET_FILE)
 
     if(NOT EXISTS "${PRESET_PATH}")
         message(FATAL_ERROR "OpenSCAD preset file not found: ${PRESET_PATH}")
+    endif()
+
+    if(NOT ARG_PRESETS)
+        file(READ "${PRESET_PATH}" PRESET_JSON)
+        string(JSON PRESET_COUNT LENGTH "${PRESET_JSON}" parameterSets)
+
+        if(PRESET_COUNT EQUAL 0)
+            message(FATAL_ERROR "OpenSCAD preset file has no parameterSets: ${PRESET_PATH}")
+        endif()
+
+        math(EXPR LAST_PRESET_INDEX "${PRESET_COUNT} - 1")
+        foreach(PRESET_INDEX RANGE 0 ${LAST_PRESET_INDEX})
+            string(JSON PRESET_NAME MEMBER "${PRESET_JSON}" parameterSets ${PRESET_INDEX})
+            list(APPEND ARG_PRESETS "${PRESET_NAME}")
+        endforeach()
     endif()
 
     file(GLOB_RECURSE MODEL_SCAD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/*.scad")
@@ -161,12 +172,28 @@ function(add_pages_site SITE_SOURCE_DIR)
     endif()
 
     add_custom_target(
+        catalog
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/generated"
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCATALOG_OUTPUT_PATH=${CMAKE_BINARY_DIR}/generated/catalog.json"
+            "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/GenerateCatalog.cmake"
+        COMMENT "Generating model catalog"
+        VERBATIM
+    )
+
+    add_custom_target(
         pages
         COMMAND "${CMAKE_COMMAND}"
             "-DSITE_SOURCE_PATH=${SITE_SOURCE_PATH}"
             "-DARTIFACT_DIR=${ARTIFACT_DIR}"
             "-DPAGES_BUILD_DIR=${PAGES_BUILD_DIR}"
+            "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
             -P "${CMAKE_SOURCE_DIR}/cmake/AssemblePages.cmake"
+        COMMAND "${CMAKE_COMMAND}"
+            "-DCATALOG_OUTPUT_PATH=${PAGES_BUILD_DIR}/catalog.json"
+            "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            -P "${CMAKE_SOURCE_DIR}/cmake/GenerateCatalog.cmake"
         DEPENDS artifacts
         COMMENT "Assembling GitHub Pages site"
         VERBATIM

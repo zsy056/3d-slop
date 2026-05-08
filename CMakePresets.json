@@ -51,6 +51,13 @@
       "targets": [
         "pages"
       ]
+    },
+    {
+      "name": "catalog",
+      "configurePreset": "default",
+      "targets": [
+        "catalog"
+      ]
     }
   ]
 }

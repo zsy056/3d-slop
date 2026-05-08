@@ -2,9 +2,8 @@
 // Dbricks Cake Generator
 //
 // Reuses the top stud geometry from dbricks_generator_v4.scad. The underside is
-// a hollow round shell with a thin wall grid. Circular clearances cut through
-// the grid at baseplate stud positions, leaving only four small wall ends to
-// touch each stud instead of fully enclosed cylinders.
+// a hollow round shell with original-style anti-stud cylinders placed at the
+// reinforcement-wall intersections used by the previous bottom grid.
 //
 
 use <dbricks_generator_v4.scad>
@@ -57,10 +56,13 @@ Bottom_compatible = 1; // [0:No, 1:Yes]
 // Add crescent cutouts to the round wall for baseplate studs at the edge.
 Partial_stud_reliefs = 1; // [0:No, 1:Yes]
 
+// Add clipped anti-stud tubes around the round edge where the tube lattice overlaps.
+Edge_partial_tubes = 1; // [0:No, 1:Yes]
+
 // Extra space around top studs before the cake edge.
 Top_edge_clearance = 0.2; // [0:0.05:2]
 
-// Clearance used around baseplate studs in the bottom grid and round wall.
+// Clearance used around baseplate studs in the round wall.
 Socket_clearance = 0.15; // [0:0.05:1]
 
 // Small lead-in chamfer for round-wall edge relief cuts.
@@ -68,21 +70,6 @@ Socket_lead_in = 0.25; // [0:0.05:1]
 
 // Depth of round-wall reliefs. 0 means auto depth for standard Dbricks studs.
 Partial_relief_depth = 0; // [0:0.1:12]
-
-// Thickness of the bottom grid walls.
-Grid_wall_thickness = 0.8; // [0.5:0.05:1.5]
-
-// Add continuous strengthening ribs halfway between stud rows and columns.
-Bottom_reinforcement_walls = 1; // [0:No, 1:Yes]
-
-// Thickness of the continuous strengthening ribs.
-Reinforcement_wall_thickness = 0.9; // [0.5:0.05:2]
-
-// Radius of the rounded lead-in on the bottom clamp wall edges.
-Bottom_wall_corner_radius = 0.25; // [0:0.05:0.4]
-
-// Number of layers used to approximate the bottom clamp wall rounding.
-Bottom_wall_corner_steps = 6; // [2:1:12]
 
 /* [Advanced] */
 
@@ -106,6 +93,21 @@ stud_height = 4.6;
 
 // Stud wall thickness from the original generator.
 stud_wall_thickness = 1.3;
+
+// Internal anti-stud cylinder outer radius from the original generator.
+cyl_radius = 6.55;
+
+// Internal anti-stud cylinder wall thickness from the original generator.
+cyl_thickness = 1;
+
+// Support ridge thickness for the internal anti-stud cylinders.
+ridge_thickness = 1;
+
+// Add cross cuts through the internal anti-stud cylinders.
+internal_cylinder_cuts = 0; // [0:No, 1:Yes]
+
+// Short wall-stud height used inside single-stud cakes.
+short_wall_stud_height = 4.6; // [1:0.1:10]
 
 // Rounded body edge radius, passed to original stud profile through this name.
 rounded_corners = 1.0; // [0:0.1:2]
@@ -140,7 +142,7 @@ module dbricks_cake(diameter_studs = 4, height_factor = 0.5, top_studs = 1, bott
         union() {
             if (bottom_compatible) {
                 cake_shell_with_reliefs(diameter_studs, radius, height, relief_radius, relief_depth);
-                bottom_wall_grid(diameter_studs, radius, height, relief_radius);
+                bottom_clutch_tube_lattice(diameter_studs, radius, height);
             } else {
                 cylinder(h = height, r = radius, $fn = curve_detail);
             }
@@ -192,141 +194,115 @@ module cake_shell(radius, height) {
 }
 
 
-module bottom_wall_grid(diameter_studs, radius, height, stud_clearance_radius) {
-    grid_height = max(0.1, height - roof_thickness + 0.12);
+module bottom_clutch_tube_lattice(diameter_studs, radius, height) {
+    clutch_height = max(0.1, height - roof_thickness + 0.1);
     inner_radius = max(0.1, radius - wall_thickness + 0.05);
-    grid_span = 2 * inner_radius + 0.4;
-    min_wall_thickness = Bottom_reinforcement_walls ?
-        min(Grid_wall_thickness, Reinforcement_wall_thickness) :
-        Grid_wall_thickness;
-    round_radius = min(
-        Bottom_wall_corner_radius,
-        max(0, min(grid_height / 2, min_wall_thickness / 2 - 0.03))
+    support = height >= std_height ? 1 : 0;
+
+    intersection() {
+        cylinder(h = clutch_height, r = inner_radius, $fn = curve_detail);
+
+        union() {
+            if (diameter_studs <= 1) {
+                single_stud_bottom_wall_studs(inner_radius, clutch_height);
+            } else {
+                for (ix = [-1 : diameter_studs - 1]) {
+                    for (iy = [-1 : diameter_studs - 1]) {
+                        x = clutch_tube_position(ix, diameter_studs);
+                        y = clutch_tube_position(iy, diameter_studs);
+                        full_tube = inside_round_footprint(x, y, inner_radius, cyl_radius);
+                        partial_tube = Edge_partial_tubes &&
+                            overlaps_round_footprint(x, y, inner_radius, cyl_radius);
+
+                        if (full_tube || partial_tube) {
+                            original_internal_cylinder(x, y, clutch_height, support);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+function clutch_tube_position(index, diameter_studs) =
+    (index - (diameter_studs - 2) / 2) * base_unit;
+
+
+module single_stud_bottom_wall_studs(inner_radius, clutch_height) {
+    wall_height = min(clutch_height, short_wall_stud_height);
+    wall_length = min(
+        max(1.0, inner_radius * 2 - 2 * Socket_clearance),
+        max(1.0, 2 * stud_radius + 2 * Socket_clearance)
     );
 
-    rounded_bottom_footprint_extrude(grid_height, round_radius) {
-        bottom_wall_grid_footprint(
-            diameter_studs,
-            inner_radius,
-            grid_span,
-            stud_clearance_radius
-        );
-    }
-}
-
-module bottom_wall_grid_footprint(
-    diameter_studs,
-    inner_radius,
-    grid_span,
-    stud_clearance_radius
-) {
-    difference() {
-        intersection() {
-            circle(r = inner_radius, $fn = curve_detail);
-
-            bottom_wall_grid_stripes(diameter_studs, grid_span);
-        }
-
-        baseplate_stud_clearance_footprint(
-            diameter_studs,
-            inner_radius,
-            stud_clearance_radius
-        );
+    for (angle = [0 : 90 : 270]) {
+        rotate([0, 0, angle])
+            translate([0, stud_radius + Socket_clearance, 0])
+                rounded_wall_stud(wall_length, wall_thickness, wall_height);
     }
 }
 
 
-module bottom_wall_grid_stripes(diameter_studs, grid_span) {
-    union() {
-        for (ix = [0 : diameter_studs - 1]) {
-            x = grid_position(ix, diameter_studs);
-            translate([x, 0])
-                square([Grid_wall_thickness, grid_span], center = true);
-        }
+module rounded_wall_stud(length, thickness, height) {
+    radius = min(rounded_corners, thickness / 2 - 0.02);
 
-        for (iy = [0 : diameter_studs - 1]) {
-            y = grid_position(iy, diameter_studs);
-            translate([0, y])
-                square([grid_span, Grid_wall_thickness], center = true);
-        }
-
-        if (Bottom_reinforcement_walls) {
-            for (ix = [0 : diameter_studs - 2]) {
-                x = (grid_position(ix, diameter_studs) +
-                    grid_position(ix + 1, diameter_studs)) / 2;
-                translate([x, 0])
-                    square([Reinforcement_wall_thickness, grid_span], center = true);
-            }
-
-            for (iy = [0 : diameter_studs - 2]) {
-                y = (grid_position(iy, diameter_studs) +
-                    grid_position(iy + 1, diameter_studs)) / 2;
-                translate([0, y])
-                    square([grid_span, Reinforcement_wall_thickness], center = true);
-            }
-        }
-    }
-}
-
-
-module baseplate_stud_clearance_footprint(diameter_studs, clip_radius, clearance_radius) {
-    for (ix = [-1 : diameter_studs]) {
-        for (iy = [-1 : diameter_studs]) {
-            x = grid_position(ix, diameter_studs);
-            y = grid_position(iy, diameter_studs);
-
-            if (overlaps_round_footprint(x, y, clip_radius, clearance_radius)) {
-                translate([x, y])
-                    circle(r = clearance_radius, $fn = curve_detail);
-            }
-        }
-    }
-}
-
-
-module rounded_bottom_footprint_extrude(height, round_radius) {
-    if (round_radius <= 0) {
-        linear_extrude(height = height, convexity = 10)
-            children();
+    if (radius <= 0) {
+        cube([length, thickness, height], center = true);
     } else {
-        layer_overlap = 0.01;
-
-        for (step = [0 : Bottom_wall_corner_steps - 1]) {
-            z0 = round_radius * step / Bottom_wall_corner_steps;
-            z1 = round_radius * (step + 1) / Bottom_wall_corner_steps;
-            zmid = (z0 + z1) / 2;
-            inset = bottom_wall_rounding_inset(round_radius, zmid);
-
-            translate([0, 0, z0])
-                linear_extrude(height = z1 - z0 + layer_overlap, convexity = 10)
-                    offset(delta = -inset)
-                        children();
-        }
-
-        translate([0, 0, round_radius - layer_overlap])
-            linear_extrude(height = height - round_radius + layer_overlap, convexity = 10)
-                children();
+        linear_extrude(height = height, convexity = 10)
+            offset(r = radius, $fn = corner_detail)
+                offset(delta = -radius)
+                    square([length, thickness], center = true);
     }
 }
 
 
-function bottom_wall_rounding_inset(radius, z) =
-    radius - sqrt(max(0, radius * radius - (radius - z) * (radius - z)));
+module original_internal_cylinder(x, y, height, support) {
+    int_cyl_corner_radius = 0.6;
 
+    translate([x, y, 0]) {
+        difference() {
+            union() {
+                rotate_extrude($fn = curve_detail) {
+                    union() {
+                        translate([0, int_cyl_corner_radius])
+                            square([cyl_radius, max(0.1, height - int_cyl_corner_radius)]);
 
-module baseplate_stud_clearances(diameter_studs, clip_radius, clearance_radius, clearance_depth) {
-    for (ix = [-1 : diameter_studs]) {
-        for (iy = [-1 : diameter_studs]) {
-            x = grid_position(ix, diameter_studs);
-            y = grid_position(iy, diameter_studs);
+                        square([max(0.1, cyl_radius - int_cyl_corner_radius), height]);
 
-            if (overlaps_round_footprint(x, y, clip_radius, clearance_radius)) {
-                translate([x, y, -0.03])
-                    cylinder(
-                        h = clearance_depth + 0.06,
-                        r = clearance_radius,
-                        $fn = curve_detail
-                    );
+                        translate([
+                            cyl_radius - int_cyl_corner_radius,
+                            int_cyl_corner_radius,
+                            0
+                        ])
+                            circle(r = int_cyl_corner_radius, $fn = corner_detail);
+                    }
+                }
+
+                if (support >= 1) {
+                    translate([0, 0, height]) {
+                        rotate([-90, 0, 45])
+                            linear_extrude(height = ridge_thickness, center = true)
+                                polygon([[-base_unit * 0.7, 0], [base_unit * 0.7, 0], [0, 14]]);
+
+                        rotate([-90, 0, -45])
+                            linear_extrude(height = ridge_thickness, center = true)
+                                polygon([[-base_unit * 0.7, 0], [base_unit * 0.7, 0], [0, 14]]);
+                    }
+                }
+            }
+
+            cylinder(
+                h = height * 3,
+                r = max(0.1, cyl_radius - cyl_thickness),
+                center = true,
+                $fn = curve_detail
+            );
+
+            if (internal_cylinder_cuts == 1) {
+                cube(size = [cyl_radius * 2, 1, height + 2], center = true);
+                cube(size = [1, cyl_radius * 2, height + 2], center = true);
             }
         }
     }
