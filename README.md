@@ -64,4 +64,4 @@ Each `.scad` model can have a neighboring OpenSCAD customizer preset file. When 
 
 ## Pages Showroom
 
-The static showcase lives in `site/` and gets assembled into `build/default/pages/`. Its catalog is generated from every `.presets.json` file: collection/model copy lives in top-level `x-3d-slop` metadata, while per-preset display copy lives beside the actual parameters as `Slop_catalog_name` and `Slop_catalog_description`. A second catalog file was clearly wearing a fake mustache. It uses Three.js in the browser to inspect STL files, because hand-rolling a 3D viewer is how a repo starts collecting haunted utility functions.
+The static showcase lives in `site/` and gets assembled into `build/default/pages/`. Its catalog is generated from every `.presets.json` file: collection metadata lives in `x-3d-slop`, while model and preset metadata ride inside each parameter set as reserved `Slop_catalog_*` strings. A second catalog file was clearly wearing a fake mustache. It uses Three.js in the browser to inspect STL files, because hand-rolling a 3D viewer is how a repo starts collecting haunted utility functions.

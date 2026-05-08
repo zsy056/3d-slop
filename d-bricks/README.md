@@ -61,4 +61,4 @@ openscad -o dist/images/dbricks_generator_v4.brick-1x2-half.png \
   d-bricks/dbricks_generator_v4.scad
 ```
 
-When adding a new preset, add it to the model's `.presets.json` file. Put showroom copy directly inside that preset as `Slop_catalog_name` and `Slop_catalog_description`, because duplicating preset IDs in a side table is how tomorrow's build learns sarcasm the hard way.
+When adding a new preset, add it to the model's `.presets.json` file. Put showroom copy directly inside that preset as `Slop_catalog_*` strings, because duplicating preset IDs in a side table is how tomorrow's build learns sarcasm the hard way.

@@ -12,6 +12,10 @@
       "short_wall_stud_height": "4.6",
       "curve_detail": "48",
       "corner_detail": "12",
+      "Slop_catalog_model_id": "dbricks-cake-generator",
+      "Slop_catalog_model_name": "D-Bricks Cake Generator",
+      "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
+      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "1x Half Plain Cake",
       "Slop_catalog_description": "A tiny cake puck with short wall studs underneath. Minimal frosting, maximum audacity."
     },
@@ -30,6 +34,10 @@
       "Edge_partial_tubes": "1",
       "curve_detail": "48",
       "corner_detail": "12",
+      "Slop_catalog_model_id": "dbricks-cake-generator",
+      "Slop_catalog_model_name": "D-Bricks Cake Generator",
+      "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
+      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "4x Scalloped Cake",
       "Slop_catalog_description": "Compact celebration puck. Surprisingly serious underside."
     },
@@ -51,6 +59,10 @@
       "Edge_partial_tubes": "1",
       "curve_detail": "48",
       "corner_detail": "12",
+      "Slop_catalog_model_id": "dbricks-cake-generator",
+      "Slop_catalog_model_name": "D-Bricks Cake Generator",
+      "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
+      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "6x Tall Wavy Cake",
       "Slop_catalog_description": "More cake. More wave. More time for OpenSCAD to contemplate existence."
     }
@@ -60,12 +72,6 @@
       "id": "d-bricks",
       "name": "D-Bricks",
       "tagline": "Brick-adjacent solids for tiny construction ambitions and large attribution responsibilities."
-    },
-    "model": {
-      "id": "dbricks-cake-generator",
-      "name": "D-Bricks Cake Generator",
-      "source": "d-bricks/dbricks_cake_generator.scad",
-      "description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry."
     }
   },
   "fileFormatVersion": "1"

@@ -2,13 +2,17 @@ import argparse
 import json
 from pathlib import Path
 
-METADATA_KEY = "x-3d-slop"
 PRESET_SUFFIX = ".presets.json"
 SKIPPED_DIR_NAMES = {".git", ".cmake", "dist", "site"}
+METADATA_KEY = "x-3d-slop"
+CATALOG_PREFIX = "Slop_catalog_"
+MODEL_ID_KEY = "Slop_catalog_model_id"
+MODEL_NAME_KEY = "Slop_catalog_model_name"
+MODEL_SOURCE_KEY = "Slop_catalog_model_source"
+MODEL_DESCRIPTION_KEY = "Slop_catalog_model_description"
 CATALOG_NAME_KEY = "Slop_catalog_name"
 CATALOG_DESCRIPTION_KEY = "Slop_catalog_description"
 CATALOG_TAGS_KEY = "Slop_catalog_tags"
-CATALOG_PARAM_KEYS = {CATALOG_NAME_KEY, CATALOG_DESCRIPTION_KEY, CATALOG_TAGS_KEY}
 
 
 def titleize_preset(preset_id):
@@ -83,6 +87,18 @@ def tags_from_metadata(value):
     return [tag.strip() for tag in str(value).split(",") if tag.strip()]
 
 
+def is_catalog_key(key):
+    return key.startswith(CATALOG_PREFIX)
+
+
+def first_catalog_value(parameter_sets, key):
+    for params in parameter_sets.values():
+        value = params.get(key)
+        if value:
+            return value
+    return None
+
+
 def collection_for_preset_file(preset_path, source_root, metadata):
     defaults_id = default_collection_id(preset_path, source_root)
     collection = metadata.get("collection", {})
@@ -97,25 +113,23 @@ def collection_for_preset_file(preset_path, source_root, metadata):
 
 
 def model_for_preset_file(preset_path, source_root, preset_data):
-    metadata = preset_data.get(METADATA_KEY, {})
-    model_meta = metadata.get("model", {})
-    source_path = source_root / model_meta["source"] if "source" in model_meta else default_source_for_preset(preset_path)
+    parameter_sets = preset_data.get("parameterSets", {})
+    source_value = first_catalog_value(parameter_sets, MODEL_SOURCE_KEY)
+    source_path = source_root / source_value if source_value else default_source_for_preset(preset_path)
     source = relative_posix(source_path, source_root)
     model_name = Path(source).stem
 
     generated_model = {
-        "id": model_meta.get("id", slug_from_name(model_name)),
-        "name": model_meta.get("name", titleize_id(model_name)),
+        "id": first_catalog_value(parameter_sets, MODEL_ID_KEY) or slug_from_name(model_name),
+        "name": first_catalog_value(parameter_sets, MODEL_NAME_KEY) or titleize_id(model_name),
         "source": source,
-        "description": model_meta.get(
-            "description",
-            "An OpenSCAD generator with presets, outputs, and enough paperwork to qualify as a hobby.",
-        ),
+        "description": first_catalog_value(parameter_sets, MODEL_DESCRIPTION_KEY)
+        or "An OpenSCAD generator with presets, outputs, and enough paperwork to qualify as a hobby.",
         "presets": [],
     }
 
-    for preset_id, params in preset_data.get("parameterSets", {}).items():
-        model_params = {key: value for key, value in params.items() if key not in CATALOG_PARAM_KEYS}
+    for preset_id, params in parameter_sets.items():
+        model_params = {key: value for key, value in params.items() if not is_catalog_key(key)}
         description = params.get(
             CATALOG_DESCRIPTION_KEY,
             "Freshly generated from preset data. The catalog wrote this one itself, and somehow that is legal.",
