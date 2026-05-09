@@ -575,7 +575,7 @@ module bottom_clutch_tube_lattice(
 
         union() {
             if (diameter_studs <= 1) {
-                single_stud_bottom_wall_studs(inner_radius, clutch_height);
+                single_stud_bottom_wall_ribs(inner_radius, clutch_height);
             } else if (slice_degrees < 360) {
                 if (Slice_bottom_stud_clutches) {
                     if (
@@ -1020,13 +1020,26 @@ function small_slice_side_wall_clamp_target(
     );
 
 
-module single_stud_bottom_wall_studs(inner_radius, clutch_height) {
-    wall_length = min(
-        max(1.0, inner_radius * 2 - 2 * Socket_clearance),
-        max(1.0, 2 * stud_radius + 2 * Socket_clearance)
-    );
+module single_stud_bottom_wall_ribs(inner_radius, clutch_height) {
+    rib_height = min(clutch_height, short_wall_stud_height);
 
-    bottom_wall_stud_socket(clutch_height, wall_length);
+    for (angle = [0 : 90 : 270]) {
+        single_stud_wall_clamp_rib(angle, inner_radius, rib_height);
+    }
+}
+
+
+module single_stud_wall_clamp_rib(angle, inner_radius, rib_height) {
+    start_distance = outer_wall_clamp_anchor_distance(inner_radius);
+    end_distance = side_wall_clamp_stud_clearance();
+    rib_length = max(0.1, start_distance - end_distance);
+    rib_width = side_wall_clamp_tip_width();
+
+    if (rib_length >= 0.6 && rib_height > 0.1) {
+        rotate([0, 0, angle])
+            translate([end_distance + rib_length / 2, 0, 0])
+                rounded_wall_stud(rib_length, rib_width, rib_height);
+    }
 }
 
 
