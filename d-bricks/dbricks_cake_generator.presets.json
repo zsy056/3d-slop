@@ -16,7 +16,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "1x Half Plain Cake",
       "Slop_catalog_description": "A tiny cake puck with short wall-grown ribs underneath. Minimal frosting, maximum audacity."
     },
@@ -39,7 +38,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "4x Scalloped Cake",
       "Slop_catalog_description": "Compact celebration puck. Surprisingly serious underside."
     },
@@ -73,7 +71,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "4x Scalloped Eighth Slice",
       "Slop_catalog_description": "One polite wedge of cake, with slicer-friendly cream grooves and a bottom socket that tries to actually clutch."
     },
@@ -107,7 +104,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "4x Scalloped Quarter Slice",
       "Slop_catalog_description": "A quarter cake slice with full top studs and cream grooves for slicer color-painting therapy."
     },
@@ -141,7 +137,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "4x Scalloped Three-Quarter Slice",
       "Slop_catalog_description": "Most of the cake, but with two cut faces politely prepared for separate cream colors."
     },
@@ -175,7 +170,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "7x Scalloped Eighth Slice",
       "Slop_catalog_description": "A large narrow cake wedge with enough underside politics to keep the center stud clamped without installing a ceremonial center tube."
     },
@@ -209,7 +203,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "7x Scalloped Quarter Slice",
       "Slop_catalog_description": "A bigger quarter cake, for when the small slice did not contain enough engineering-shaped frosting regret."
     },
@@ -243,7 +236,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "7x Scalloped Three-Quarter Slice",
       "Slop_catalog_description": "Most of a larger cake, with the missing quadrant doing its best to look intentional in slicer preview."
     },
@@ -269,7 +261,6 @@
       "Slop_catalog_model_id": "dbricks-cake-generator",
       "Slop_catalog_model_name": "D-Bricks Cake Generator",
       "Slop_catalog_model_source": "d-bricks/dbricks_cake_generator.scad",
-      "Slop_catalog_model_description": "A round decorative brick-compatible cake, because the model collection apparently demanded frosting with clutch geometry.",
       "Slop_catalog_name": "6x Tall Wavy Cake",
       "Slop_catalog_description": "More cake. More wave. More time for OpenSCAD to contemplate existence."
     }

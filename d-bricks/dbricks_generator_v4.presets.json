@@ -14,7 +14,6 @@
       "Slop_catalog_model_id": "dbricks-generator-v4",
       "Slop_catalog_model_name": "D-Bricks Generator v4",
       "Slop_catalog_model_source": "d-bricks/dbricks_generator_v4.scad",
-      "Slop_catalog_model_description": "The square-ish workhorse: bricks, plates, studs, and the sort of underside geometry that says someone cared a dangerous amount. Based on Badger's printable brick generator: https://www.thingiverse.com/thing:3320303.",
       "Slop_catalog_name": "1x2 Half Brick",
       "Slop_catalog_description": "Small, practical, already judging your layer height."
     },
@@ -32,7 +31,6 @@
       "Slop_catalog_model_id": "dbricks-generator-v4",
       "Slop_catalog_model_name": "D-Bricks Generator v4",
       "Slop_catalog_model_source": "d-bricks/dbricks_generator_v4.scad",
-      "Slop_catalog_model_description": "The square-ish workhorse: bricks, plates, studs, and the sort of underside geometry that says someone cared a dangerous amount. Based on Badger's printable brick generator: https://www.thingiverse.com/thing:3320303.",
       "Slop_catalog_name": "2x4 Standard Brick",
       "Slop_catalog_description": "A classic rectangle, now with fewer licensing problems and more build logs."
     },
@@ -50,7 +48,6 @@
       "Slop_catalog_model_id": "dbricks-generator-v4",
       "Slop_catalog_model_name": "D-Bricks Generator v4",
       "Slop_catalog_model_source": "d-bricks/dbricks_generator_v4.scad",
-      "Slop_catalog_model_description": "The square-ish workhorse: bricks, plates, studs, and the sort of underside geometry that says someone cared a dangerous amount. Based on Badger's printable brick generator: https://www.thingiverse.com/thing:3320303.",
       "Slop_catalog_name": "4x4 Baseplate",
       "Slop_catalog_description": "A small foundation for big plans and medium regrets."
     }

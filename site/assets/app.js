@@ -121,14 +121,12 @@ function renderCatalog(catalog) {
         button.type = "button";
         button.innerHTML = `
           <img alt="" loading="lazy">
-          <span>
+          <span class="preset-copy">
             <span class="preset-name"></span>
-            <span class="preset-subtitle"></span>
           </span>
         `;
         button.querySelector("img").src = preset.image;
         button.querySelector(".preset-name").textContent = preset.name;
-        button.querySelector(".preset-subtitle").textContent = preset.subtitle;
         button.addEventListener("click", () => selectPreset({ collection, model, preset, button }));
         group.append(button);
       }
@@ -163,7 +161,7 @@ function selectPreset(item) {
 
   activeCollectionEl.textContent = item.collection.name;
   activeTitleEl.textContent = item.preset.name;
-  activeSubtitleEl.textContent = item.preset.subtitle;
+  activeSubtitleEl.textContent = item.preset.description ?? item.preset.subtitle;
   activeSourceEl.textContent = item.model.source;
   activeDimensionsEl.textContent = "-";
   activeTrianglesEl.textContent = "-";
