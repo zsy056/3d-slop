@@ -1,0 +1,4 @@
+interface:
+  display_name: "Brick Generator"
+  short_description: "Design parametric brick generators."
+  default_prompt: "Use $brick-generator to design or modify a brick-compatible OpenSCAD generator and validate its artifacts."
