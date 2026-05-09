@@ -571,7 +571,12 @@ module bottom_clutch_tube_lattice(
     support = height >= std_height ? 1 : 0;
 
     intersection() {
-        cylinder(h = clutch_height, r = inner_radius, $fn = curve_detail);
+        bottom_clutch_footprint_clip(
+            inner_radius,
+            clutch_height,
+            slice_degrees,
+            slice_rotation_degrees
+        );
 
         union() {
             if (diameter_studs <= 1) {
@@ -594,6 +599,12 @@ module bottom_clutch_tube_lattice(
                             slice_degrees,
                             slice_rotation_degrees,
                             0
+                        );
+                        bottom_slice_center_wall(
+                            radius,
+                            clutch_height,
+                            slice_degrees,
+                            slice_rotation_degrees
                         );
                         bottom_slice_side_wall_clamps(
                             diameter_studs,
@@ -636,6 +647,23 @@ module bottom_clutch_tube_lattice(
 }
 
 
+module bottom_clutch_footprint_clip(
+    inner_radius,
+    clutch_height,
+    slice_degrees,
+    slice_rotation_degrees
+) {
+    if (slice_degrees < 360) {
+        intersection() {
+            cylinder(h = clutch_height, r = inner_radius, $fn = curve_detail);
+            cake_slice_clip(inner_radius, clutch_height, slice_degrees, slice_rotation_degrees);
+        }
+    } else {
+        cylinder(h = clutch_height, r = inner_radius, $fn = curve_detail);
+    }
+}
+
+
 function clutch_tube_position(index, diameter_studs) =
     (index - (diameter_studs - 2) / 2) * base_unit;
 
@@ -656,12 +684,11 @@ module bottom_original_internal_cylinders(
             full_tube = inside_round_footprint(x, y, inner_radius, cyl_radius);
             partial_tube = allow_partial_tubes &&
                 overlaps_round_footprint(x, y, inner_radius, cyl_radius);
-            fits_slice = inside_sector_footprint(
+            fits_slice = anti_stud_tube_fits_slice(
                 x,
                 y,
                 slice_degrees,
-                slice_rotation_degrees,
-                cyl_radius
+                slice_rotation_degrees
             );
 
             if ((full_tube || partial_tube) && fits_slice) {
@@ -669,6 +696,16 @@ module bottom_original_internal_cylinders(
             }
         }
     }
+}
+
+
+module bottom_slice_center_wall(radius, clutch_height, slice_degrees, slice_rotation_degrees) {
+    cake_sector_solid(
+        slice_center_closure_radius(radius),
+        clutch_height,
+        slice_degrees,
+        slice_rotation_degrees
+    );
 }
 
 
@@ -878,6 +915,17 @@ function bottom_wall_socket_fit_radius() =
     );
 
 
+function anti_stud_tube_fits_slice(
+    x,
+    y,
+    slice_degrees,
+    slice_rotation_degrees
+) =
+    slice_degrees < 360 ?
+        overlaps_sector_footprint(x, y, slice_degrees, slice_rotation_degrees, cyl_radius) :
+        inside_sector_footprint(x, y, slice_degrees, slice_rotation_degrees, cyl_radius);
+
+
 function slice_bottom_wall_socket_count(
     diameter_studs,
     inner_radius,
@@ -936,7 +984,13 @@ function outer_wall_clamp_candidate(
         visible_length = outer_wall_clamp_visible_length(x, y, inner_radius)
     )
     overlaps_round_footprint(x, y, inner_radius, stud_clearance) &&
-    overlaps_sector_footprint(x, y, slice_degrees, slice_rotation_degrees, stud_clearance) &&
+    inside_sector_footprint(
+        x,
+        y,
+        slice_degrees,
+        slice_rotation_degrees,
+        stud_clearance
+    ) &&
     visible_length >= 0.6 &&
     visible_length <= Slice_side_clamp_reach;
 
@@ -1140,8 +1194,16 @@ module baseplate_stud_reliefs(
                 slice_degrees < 360 &&
                 overlaps_round_footprint(x, y, radius, cut_radius) &&
                 overlaps_sector_boundary(x, y, slice_degrees, slice_rotation_degrees, cut_radius);
+            center_wall_hit =
+                slice_degrees < 360 &&
+                overlaps_round_footprint(
+                    x,
+                    y,
+                    slice_center_closure_radius(radius),
+                    cut_radius
+                );
 
-            if (round_wall_hit || radial_wall_hit) {
+            if (round_wall_hit || radial_wall_hit || center_wall_hit) {
                 translate([x, y, -0.03]) {
                     cylinder(h = relief_depth + 0.06, r = relief_radius, $fn = curve_detail);
 

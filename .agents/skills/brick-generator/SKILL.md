@@ -13,8 +13,10 @@ description: Design, modify, and validate parametric OpenSCAD generators for bri
 4. Place top studs only when the full stud fits the footprint. Avoid partial top studs unless the user explicitly wants decorative nonsense with legal consequences.
 5. Choose bottom clutch geometry by available footprint, not by optimism:
    - Large areas: prefer original-style round anti-stud cylinders where full tubes fit.
+   - Large sliced areas: keep the original anti-stud ring lattice intact, then clip it to the slice footprint. If a tube hollow intersects a center closure or cut wall, restore the wall material and add stud relief cuts where needed; do not delete the ring just because the hollow is inconvenient.
    - Boundary areas: add ribs or short walls that physically grow from a side wall or curved wall.
    - Tiny/narrow areas: use wall-grown short ribs aimed at the stud clearance circle.
+   - Special-case only genuinely tiny footprints, usually diameter 1 or 2, where the original ring pattern is not physically meaningful.
 6. Keep slicer paint/detail grooves shallow, consistent, and bounded. Grooves should meet intentional boundaries with tiny overlap, not tunnel through thin walls like a bad idea with a cube primitive.
 7. Put preset-specific metadata in each OpenSCAD `.presets.json` `parameterSets` entry using `Slop_catalog_*` keys. Use `x-3d-slop` only for collection-level metadata.
 8. Update collection docs when new user-facing parameters, presets, or behavior appear. Keep the repo voice dry and funny, but make commands and dimensions boringly correct.

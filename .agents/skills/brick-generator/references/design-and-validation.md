@@ -10,6 +10,7 @@ What worked:
 - Treat slices and round cakes as real footprints, not clipped cubes. Closed radial side walls, center closure, full-stud top placement, and clipped side decorations made the cake generator predictable.
 - Validate visually and mechanically. Top-down underside renders caught ribs that looked fine in code but did not connect to walls. Oblique renders caught height and attachment problems. CMake target builds caught whether the artifact path actually worked.
 - Prefer wall-grown ribs for narrow or one-stud cases. Ribs need to connect to a side wall or curved wall and stop near the stud clearance circle; floating roof ribs mostly provide decorative anxiety.
+- Preserve the original anti-stud ring lattice for large sliced footprints. When a ring hollow intersects the center closure or a cut wall, put the wall back and leave only the stud relief actually needed for clamping. Deleting a tube may look tidy, but it breaks the pattern and quietly steals clutch.
 - Keep grooves shallow and consistent. Cake layer grooves and cream-shell paint lines worked once they shared depth, overlapped just enough at corners, stopped at intended boundaries, and avoided cutting through thin side walls.
 
 What did not work:
@@ -17,6 +18,7 @@ What did not work:
 - Simple sector clipping created open or weak slice faces. Slices need explicit shell/cavity logic with radial side walls and center closure.
 - Partial top studs made bad functional geometry. Removing partial top studs and requiring full containment gave cleaner, more predictable clutch.
 - Partial bottom studs and clamp ribs placed only by "looks nearby" logic were unreliable. Ribs must be targeted against an actual stud clearance circle and anchored to a wall.
+- Removing center-adjacent anti-stud tubes to protect the slice center wall was the wrong abstraction. The right fix is uniform ring placement, footprint clipping, center-wall restoration, and relief cuts only where the lower studs need room.
 - A real brick fitting a generated brick did not prove generated-on-generated fit. Printed top studs can be effectively smaller because of rounded profiles, slicer horizontal compensation, shrink, elephant-foot compensation, and material flex.
 - Duplicated metadata was fragile. Catalog data belongs beside the preset it describes; separate side tables invite stale IDs and tiny administrative ruin.
 
@@ -33,7 +35,7 @@ Use this structure for round or sliced brick-compatible models:
 5. Build the underside by case:
    - Diameter 1: short ribs grown from the round wall toward the center stud.
    - Full larger cake: original internal anti-stud cylinders; allow edge partial tubes only when intentionally supported.
-   - Sliced larger cake: original full anti-stud cylinders where they fit, plus side-wall and curved-wall helper ribs for boundary studs.
+   - Sliced larger cake: original anti-stud ring lattice selected by footprint overlap and clipped to the slice, plus side-wall and curved-wall helper ribs for boundary studs. Keep the ring pattern even when a tube hollow reaches the center closure; restore the center wall afterward and let relief cuts handle actual stud clearance.
    - Very narrow slices: short ribs from both radial side walls and the curved wall, aimed at the same stud target.
 6. Make paint/detail grooves as shallow subtractive features. Use the same groove depth for related paint lines, overlap corners slightly, and stop horizontal grooves at vertical boundaries unless the design explicitly says otherwise.
 
@@ -77,6 +79,7 @@ Run a focused loop for every geometry change:
    - full top studs only;
    - ribs attached to walls, not just the roof;
    - anti-studs or ribs aligned with real grid/stud targets;
+   - large slices keep the expected anti-stud ring pattern instead of acquiring a suspicious bald center;
    - shallow grooves that do not pierce thin walls;
    - no accidental output outside ignored artifact folders.
 6. For physical fit, print a small calibration preset first. Change one of these at a time: `Stud_radius_compensation`, bottom clearance, rib width, or rib reach. Reprinting a whole cake to tune 0.05 mm is how filament learns contempt.
