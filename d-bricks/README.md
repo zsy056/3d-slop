@@ -37,8 +37,15 @@ Current cake presets, because apparently the brick ecosystem needed dessert:
 ```text
 cake-1x-half-plain
 cake-4x-scalloped
+cake-4x-scalloped-eighth-slice
+cake-4x-scalloped-quarter-slice
+cake-4x-scalloped-three-quarter-slice
 cake-6x-tall-wavy
 ```
+
+Cake slices use `Cake_slice_degrees`, with `360` meaning the whole cake and smaller angles producing carefully walled wedges. `Cake_core_layers` adds visible cream separators on sliced faces so slicer color tools have something better to click than "the entire unfortunate wall." Those layer grooves stop at the outer cream-shell paint line instead of wandering into the frosting like they own the place. `Slice_bottom_stud_clutches` gives narrow wedges side-wall clamp ribs, while wider slices get original-style round anti-studs plus small side-wall helpers, because apparently even dessert needs a load path.
+
+`Stud_radius_compensation` adds a little extra radius to generated top studs. The shipped presets use `0.15` mm, which is the polite way of saying "my printer lies, but at least now it lies parametrically." If generated-on-generated clutch is loose, nudge it upward in tiny increments; if real-world bricks start putting up a fight, back it down.
 
 ## Direct OpenSCAD Export
 

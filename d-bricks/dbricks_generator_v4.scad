@@ -67,6 +67,8 @@ wall_thickness = 1.5;
 roof_thickness = 1.4;
 // Stud outer radius
 stud_radius = 4.67;
+// Extra radius added to top studs for print-to-print clutch tuning.
+Stud_radius_compensation = 0.15; // [-0.3:0.01:0.5]
 // height of the stud
 stud_height = 4.6;
 //stud wall thickness
@@ -106,6 +108,10 @@ full_body = 0; //[0:Hollow, 1:Full body]
 stud_clearance = 0.5;
 
 
+function top_stud_radius() =
+    max(stud_wall_thickness + 0.2, stud_radius + Stud_radius_compensation);
+
+
 brick(X_size, Y_size, Height_factor, Studs,Type,Sparse_bottom);
 //stud_extruded((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
 
@@ -131,14 +137,14 @@ module base_plate(nx=1, ny=1, heightfact, stud_type=3) {
 		// Studs
 		if (stud_type != 0) for (r=[0:nx-1])for (c=[0:ny-1]){
 			if(stud_type == 1){
-				stud((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
+				stud((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, top_stud_radius());
 			}
 			if (stud_type == 2) {
-				stud_v2((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
+				stud_v2((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, top_stud_radius());
 			}
 			if (stud_type == 3) {
 				stud_extruded((base_unit/2) + r * base_unit, base_unit/2 + c *
-base_unit, base_plate_thickness, stud_radius);
+base_unit, base_plate_thickness, top_stud_radius());
 			}
 		}
 	}
@@ -169,13 +175,13 @@ module standard_brick(nx, ny, heightfact, stud_type=3, sparse_bottom=1) {
 		// Studs
 		if (stud_type != 0) for (r=[0:nx-1])for (c=[0:ny-1]){
 			if(stud_type == 1){
-				stud((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
+				stud((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, top_stud_radius());
 			}
 			if (stud_type == 2) {
-				stud_v2((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
+				stud_v2((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, top_stud_radius());
 			}
 			if (stud_type == 3) {
-				stud_extruded((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
+				stud_extruded((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, top_stud_radius());
 			}
 		}
 
