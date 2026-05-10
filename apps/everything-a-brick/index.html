@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Everything-a-brick | 3D Slop</title>
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="back-link" href="../">Back to the pile</a>
+      <div>
+        <p class="eyebrow">Everything-a-brick</p>
+        <h1>Everything Is A Brick Now</h1>
+      </div>
+      <p class="header-copy">Load an STL, place a mounting plane, and cut D-Brick-ish clutch features into the original mesh. No bonus brick tumor, just subtractive regret.</p>
+    </header>
+
+    <main class="app-layout">
+      <section class="tool-panel" aria-label="Everything-a-brick controls">
+        <div class="panel-heading">
+          <p class="eyebrow">Victim intake</p>
+          <h2>Feed the mesh</h2>
+        </div>
+
+        <div class="control-stack">
+          <label class="file-picker">
+            <span>STL file</span>
+            <input id="stlFile" type="file" accept=".stl,model/stl">
+          </label>
+
+          <button id="demoButton" class="secondary-button" type="button">Load Demo Sphere</button>
+
+          <div class="control-grid">
+            <label>
+              <span>Plane X</span>
+              <input id="planeX" type="number" min="-120" max="120" step="0.1" value="0">
+            </label>
+            <label>
+              <span>Plane Y</span>
+              <input id="planeY" type="number" min="-120" max="120" step="0.1" value="0">
+            </label>
+            <label>
+              <span>Pitch</span>
+              <input id="planePitch" type="number" min="-180" max="180" step="1" value="0">
+            </label>
+            <label>
+              <span>Roll</span>
+              <input id="planeRoll" type="number" min="-180" max="180" step="1" value="0">
+            </label>
+            <label>
+              <span>Grid line</span>
+              <input id="gridAngle" type="number" min="-180" max="180" step="1" value="0">
+            </label>
+          </div>
+
+          <label class="range-control">
+            <span>Plane offset <output id="planeZValue">0.0 mm</output></span>
+            <input id="planeZ" type="range" min="0" max="20" step="0.1" value="0">
+          </label>
+
+          <button id="buildButton" class="primary-button" type="button">Cut D-Brick Mounts</button>
+          <a id="downloadLink" class="download-link is-disabled" href="#" download="d-brickified.stl" aria-disabled="true">Download STL</a>
+        </div>
+      </section>
+
+      <section class="viewer-panel" aria-label="Generated model preview">
+        <div class="viewer-toolbar">
+          <div>
+            <p class="eyebrow">Preview</p>
+            <h2 id="modelTitle">Demo Sphere</h2>
+          </div>
+          <div class="toolbar-actions">
+            <button id="movePlaneButton" type="button" aria-pressed="true">Move Plane</button>
+            <button id="rotatePlaneButton" type="button" aria-pressed="false">Rotate Plane</button>
+            <button id="sourceButton" type="button" aria-pressed="false">Source</button>
+            <button id="resultButton" type="button" aria-pressed="true">Brickified</button>
+            <button id="deletePartButton" type="button" disabled>Delete Selected</button>
+            <button id="resetCameraButton" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div class="viewer-shell">
+          <canvas id="brickCanvas" aria-label="Everything-a-brick 3D preview"></canvas>
+          <div id="statusText" class="status-card" role="status" data-testid="brickify-status">Warming the geometry kernel...</div>
+        </div>
+
+        <div class="details-grid">
+          <div class="details-block">
+            <p class="eyebrow">Footprint</p>
+            <p id="footprintStat">-</p>
+          </div>
+          <div class="details-block">
+            <p class="eyebrow">Source</p>
+            <p id="sourceStat">-</p>
+          </div>
+          <div class="details-block">
+            <p class="eyebrow">Result</p>
+            <p id="resultStat">-</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

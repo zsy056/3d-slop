@@ -2,6 +2,9 @@
 /dist/
 /.cmake/
 /site/catalog.json
+/node_modules/
+/playwright-report/
+/test-results/
 
 # CMake generator output, in case someone configures in the source tree.
 /CMakeCache.txt

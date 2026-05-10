@@ -1,0 +1,32 @@
+{
+  "name": "3d-slop",
+  "version": "1.0.0",
+  "description": "Welcome to 3D Slop: a repo for parametric 3D models that aspire to be useful, printable, and only mildly embarrassing when inspected in cross-section. It is a place where the best looking and functioning part of your print may still be the purge tower.",
+  "private": true,
+  "scripts": {
+    "build:everything-a-brick": "vite build --config apps/everything-a-brick/vite.config.mjs",
+    "dev:everything-a-brick": "vite --config apps/everything-a-brick/vite.config.mjs --host 127.0.0.1",
+    "preview:everything-a-brick": "vite preview --config apps/everything-a-brick/vite.config.mjs --host 127.0.0.1",
+    "test": "npm run test:e2e",
+    "test:e2e": "playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zsy056/3d-slop.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zsy056/3d-slop/issues"
+  },
+  "homepage": "https://github.com/zsy056/3d-slop#readme",
+  "dependencies": {
+    "manifold-3d": "^3.4.1",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "vite": "^8.0.11"
+  }
+}

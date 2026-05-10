@@ -166,6 +166,7 @@ endfunction()
 function(add_pages_site SITE_SOURCE_DIR)
     get_filename_component(SITE_SOURCE_PATH "${SITE_SOURCE_DIR}" ABSOLUTE BASE_DIR "${CMAKE_SOURCE_DIR}")
     set(PAGES_BUILD_DIR "${CMAKE_BINARY_DIR}/pages" CACHE PATH "Directory for assembled GitHub Pages site")
+    set(EVERYTHING_A_BRICK_DIST_DIR "${CMAKE_SOURCE_DIR}/build/everything-a-brick" CACHE PATH "Built everything-a-brick browser app")
 
     if(NOT EXISTS "${SITE_SOURCE_PATH}")
         message(FATAL_ERROR "Pages source directory not found: ${SITE_SOURCE_PATH}")
@@ -189,6 +190,7 @@ function(add_pages_site SITE_SOURCE_DIR)
             "-DARTIFACT_DIR=${ARTIFACT_DIR}"
             "-DPAGES_BUILD_DIR=${PAGES_BUILD_DIR}"
             "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+            "-DEVERYTHING_A_BRICK_DIST_DIR=${EVERYTHING_A_BRICK_DIST_DIR}"
             -P "${CMAKE_SOURCE_DIR}/cmake/AssemblePages.cmake"
         COMMAND "${CMAKE_COMMAND}"
             "-DCATALOG_OUTPUT_PATH=${PAGES_BUILD_DIR}/catalog.json"

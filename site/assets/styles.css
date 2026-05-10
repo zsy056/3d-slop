@@ -205,6 +205,31 @@ a {
   line-height: 1.15;
 }
 
+.preset-hint {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.app-link-button {
+  margin: 14px;
+  text-decoration: none;
+}
+
+.app-link-art {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 60px;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--blue);
+  font-weight: 950;
+}
+
 .viewer-toolbar {
   display: flex;
   justify-content: space-between;

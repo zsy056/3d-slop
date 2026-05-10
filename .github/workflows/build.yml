@@ -67,6 +67,21 @@ jobs:
           echo "OPENSCAD_EXECUTABLE=$OPENSCAD_PATH" >> "$GITHUB_ENV"
           echo "OpenSCAD executable: $OPENSCAD_PATH"
 
+      - name: Set up Node for Pages app
+        if: runner.os == 'Linux'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Pages app dependencies
+        if: runner.os == 'Linux'
+        run: npm ci
+
+      - name: Build everything-a-brick app
+        if: runner.os == 'Linux'
+        run: npm run build:everything-a-brick
+
       - name: Configure
         run: cmake --preset default ${{ matrix.configure_args }}
 

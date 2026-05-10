@@ -28,3 +28,9 @@ endforeach()
 
 file(COPY "${SITE_SOURCE_PATH}/" DESTINATION "${PAGES_BUILD_DIR}")
 file(COPY "${ARTIFACT_DIR}/" DESTINATION "${PAGES_BUILD_DIR}/dist")
+
+if(DEFINED EVERYTHING_A_BRICK_DIST_DIR AND EXISTS "${EVERYTHING_A_BRICK_DIST_DIR}/index.html")
+    file(COPY "${EVERYTHING_A_BRICK_DIST_DIR}/" DESTINATION "${PAGES_BUILD_DIR}/everything-a-brick")
+else()
+    message(WARNING "everything-a-brick app bundle not found; build it with npm run build:everything-a-brick before assembling Pages.")
+endif()
