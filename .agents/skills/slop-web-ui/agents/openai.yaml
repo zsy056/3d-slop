@@ -1,0 +1,4 @@
+interface:
+  display_name: "Slop Web UI"
+  short_description: "Design 3D Slop apps and Pages."
+  default_prompt: "Use $slop-web-ui to design or modify a 3D Slop web app or GitHub Pages UI that matches the repo."
