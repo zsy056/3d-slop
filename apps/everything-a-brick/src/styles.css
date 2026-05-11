@@ -86,7 +86,7 @@ input {
 
 .app-layout {
   display: grid;
-  grid-template-columns: minmax(18rem, 25rem) minmax(0, 1fr);
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
   gap: 18px;
   width: min(1480px, calc(100% - 32px));
   margin: 0 auto 28px;
@@ -127,7 +127,6 @@ input {
 }
 
 .file-picker,
-.control-grid label,
 .range-control {
   display: grid;
   gap: 7px;
@@ -138,7 +137,6 @@ input {
 }
 
 .file-picker input,
-.control-grid input,
 .range-control input {
   width: 100%;
   min-height: 42px;
@@ -151,17 +149,6 @@ input {
 .file-picker input {
   padding: 8px;
   text-transform: none;
-}
-
-.control-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.control-grid input {
-  padding: 0 10px;
-  font-weight: 850;
 }
 
 .range-control span {
@@ -337,7 +324,6 @@ input {
     font-size: 3.15rem;
   }
 
-  .control-grid,
   .details-grid {
     grid-template-columns: 1fr;
   }

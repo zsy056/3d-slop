@@ -140,6 +140,7 @@ window.__everythingABrick = {
   loadDemo: () => loadDemo(),
   reset: () => resetWork(),
   deleteSelectedPart: () => deleteSelectedPart(),
+  setCamera: ({ position, target }) => setDebugCamera(position, target),
   getState: () => ({
     sourceLoaded: Boolean(state.sourceManifold),
     resultLoaded: state.resultManifolds.length > 0,
@@ -152,10 +153,11 @@ window.__everythingABrick = {
     selectedResultIndex: state.selectedResultIndex,
     splitInfo: state.splitInfo,
     planePreview: state.planePreview,
-  dimensions: {
+    dimensions: {
       studHeight: D.studHeight,
       studHeightClearance: D.studHeightClearance,
-      studFeatureDepth: studFeatureDepth()
+      studFeatureDepth: studFeatureDepth(),
+      minimumMountDepth: minimumMountDepth()
     },
     plane: planeState(),
     camera: {
@@ -260,7 +262,7 @@ function normalizeManifold(manifold) {
 
 function recommendControls(bounds) {
   const spanZ = bounds.max[2] - bounds.min[2];
-  const depth = studFeatureDepth();
+  const maxOffset = Math.max(0, spanZ - 0.2);
 
   els.planeX.value = "0";
   els.planeY.value = "0";
@@ -268,9 +270,20 @@ function recommendControls(bounds) {
   els.planeRoll.value = "0";
   els.gridAngle.value = "0";
   els.planeZ.min = "0";
-  els.planeZ.max = Math.max(0, spanZ - 0.2).toFixed(1);
-  els.planeZ.value = clamp(Math.min(depth * 1.3, spanZ - depth), 0, Number(els.planeZ.max)).toFixed(1);
+  els.planeZ.max = maxOffset.toFixed(1);
+  els.planeZ.value = clamp(recommendedPlaneOffset(spanZ), 0, maxOffset).toFixed(1);
   syncPlaneHandleFromInputs();
+}
+
+function recommendedPlaneOffset(spanZ) {
+  const minDepth = minimumMountDepth();
+  if (spanZ >= minDepth * 2) {
+    return minDepth;
+  }
+  if (spanZ > minDepth) {
+    return spanZ - minDepth;
+  }
+  return Math.min(studFeatureDepth() * 1.3, Math.max(0, spanZ - studFeatureDepth()));
 }
 
 function buildBrick() {
@@ -287,7 +300,7 @@ function buildBrick() {
     const planeOffset = planeFrame.normal.dot(planeFrame.origin);
     const [front, back] = state.sourceManifold.splitByPlane(vectorToArray(planeFrame.normal), planeOffset);
     const depth = projectedDepths(state.sourceBounds, planeFrame.normal, planeOffset);
-    const requiredDepth = studFeatureDepth();
+    const requiredDepth = minimumMountDepth();
     const parts = [];
     const featureStats = {};
     const kept = [];
@@ -317,7 +330,7 @@ function buildBrick() {
       clearResult();
       state.splitInfo = { kept: [], discarded, frontDepth: depth.front, backDepth: depth.back, requiredDepth, featureStats };
       updateStats();
-      setStatus("Both sides are too shallow for a stud-height mounting pattern. The mesh has declined brickhood.");
+      setStatus("Both sides are too shallow for a sturdy mounting pattern. The mesh has declined brickhood.");
       return;
     }
 
@@ -575,21 +588,29 @@ function makeMountCutter(localPart) {
     studOpeningRadius()
   );
   const partialAntiStudCenters = findPartialAntiStudCenters(antiStudCenters, face);
-  const edgeWallMask = partialAntiStudEdgeWallMask(face.section, partialAntiStudCenters, depth);
-  let cutter = combine([
-    ...antiStudCenters.map((center) => antiStudPocket(depth, [center[0], center[1], 0])),
-    ...studCenters.map((center) => studOpening(depth, center))
-  ]);
-  if (edgeWallMask) {
-    cutter = cutter.subtract(edgeWallMask);
+  const exteriorKeepOut = exteriorSurfaceKeepOut(localPart, depth);
+  const cutterParts = [];
+  if (antiStudCenters.length) {
+    let antiStudCutter = combine(
+      antiStudCenters.map((center) => antiStudPocket(depth, [center[0], center[1], 0]))
+    );
+    if (exteriorKeepOut) {
+      antiStudCutter = antiStudCutter.subtract(exteriorKeepOut);
+    }
+    if (!antiStudCutter.isEmpty()) {
+      cutterParts.push(antiStudCutter);
+    }
+  }
+  if (studCenters.length) {
+    cutterParts.push(combine(studCenters.map((center) => studOpening(depth, center))));
   }
 
   return {
-    cutter: antiStudCenters.length || studCenters.length ? cutter : null,
+    cutter: cutterParts.length ? combine(cutterParts) : null,
     features: {
       antiStuds: antiStudCenters.length,
       partialAntiStuds: partialAntiStudCenters.length,
-      edgeWallRestores: edgeWallMask ? partialAntiStudCenters.length : 0,
+      edgeWallRestores: exteriorKeepOut ? partialAntiStudCenters.length : 0,
       studOpenings: studCenters.length,
       antiStudCenters,
       partialAntiStudCenters,
@@ -641,26 +662,34 @@ function findPartialAntiStudCenters(centers, face) {
   });
 }
 
-function partialAntiStudEdgeWallMask(section, partialCenters, depth) {
-  if (!section || section.isEmpty() || !partialCenters.length) {
+function exteriorSurfaceKeepOut(localPart, depth) {
+  const depthPart = clipToFeatureDepth(localPart, depth);
+  if (depthPart.isEmpty()) {
     return null;
   }
 
-  const inset = section.offset(-partialAntiStudWallThickness(), "Round", 2, 16).simplify(0.02);
-  const boundaryBand = inset.isEmpty() ? section : section.subtract(inset);
-  if (boundaryBand.isEmpty()) {
+  const projection = depthPart.project().simplify(0.04);
+  const inset = projection.offset(-exteriorSkinThickness(), "Round", 2, 24).simplify(0.03);
+  const skinSection = inset.isEmpty() ? projection : projection.subtract(inset).simplify(0.03);
+  if (skinSection.isEmpty()) {
     return null;
   }
 
   const height = depth + EPSILON * 4;
-  const partialTubes = combine(partialCenters.map((center) => Manifold.cylinder(
-    height,
-    antiStudToolRadius(),
-    antiStudToolRadius(),
-    72
-  ).translate([center[0], center[1], -EPSILON * 2])));
-  const mask = boundaryBand.extrude(height).translate([0, 0, -EPSILON * 2]).intersect(partialTubes);
+  const skinVolume = skinSection.extrude(height).translate([0, 0, -EPSILON * 2]);
+  const mask = depthPart.intersect(skinVolume);
   return mask.isEmpty() ? null : mask;
+}
+
+function clipToFeatureDepth(localPart, depth) {
+  const bounds = localPart.boundingBox();
+  const margin = D.unit;
+  const sizeX = bounds.max[0] - bounds.min[0] + margin * 2;
+  const sizeY = bounds.max[1] - bounds.min[1] + margin * 2;
+  const sizeZ = depth + EPSILON * 4;
+  const clip = Manifold.cube([sizeX, sizeY, sizeZ])
+    .translate([bounds.min[0] - margin, bounds.min[1] - margin, -EPSILON * 2]);
+  return localPart.intersect(clip);
 }
 
 function antiStudPocket(height, center) {
@@ -699,12 +728,16 @@ function antiStudToolRadius() {
   return D.antiStudOuterRadius + D.featureClearance;
 }
 
-function partialAntiStudWallThickness() {
-  return Math.max(1.2, D.antiStudWall + 0.25);
+function exteriorSkinThickness() {
+  return Math.max(1.8, D.antiStudWall + 0.8);
 }
 
 function studFeatureDepth() {
   return D.studHeight + D.studHeightClearance;
+}
+
+function minimumMountDepth() {
+  return D.unit;
 }
 
 function circleFitsBounds(center, radius, bounds) {
@@ -877,6 +910,11 @@ function setPlaneToolVisible(visible) {
   planeHandle.visible = visible;
   transformHelper.visible = visible;
   transformControls.enabled = visible;
+  if (!visible) {
+    controls.enabled = true;
+  }
+  els.movePlaneButton.hidden = !visible;
+  els.rotatePlaneButton.hidden = !visible;
 }
 
 function renderManifolds(manifolds, color, { frame = true } = {}) {
@@ -1201,6 +1239,17 @@ function frameCameraBox(box) {
   controls.update();
 
   grid.scale.setScalar(Math.max(1, radius / 50));
+}
+
+function setDebugCamera(position, target) {
+  if (!Array.isArray(position) || !Array.isArray(target) || position.length !== 3 || target.length !== 3) {
+    return;
+  }
+
+  camera.position.fromArray(position);
+  controls.target.fromArray(target);
+  camera.lookAt(controls.target);
+  controls.update();
 }
 
 function animate() {

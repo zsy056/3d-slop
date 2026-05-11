@@ -10,10 +10,12 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
 
   await expect(page.getByRole("heading", { name: /everything is a brick now/i })).toBeVisible();
-  await page.locator("#planeZ").evaluate((input) => {
-    input.value = "10";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await expect(page.locator("#planeX")).toBeHidden();
+  await expect(page.locator("#planeY")).toBeHidden();
+  await expect(page.locator("#planeZ")).toBeHidden();
+  await expect(page.locator("#planePitch")).toBeHidden();
+  await expect(page.locator("#planeRoll")).toBeHidden();
+  await expect(page.locator("#gridAngle")).toBeHidden();
 
   await page.getByRole("button", { name: "Cut D-Brick Mounts" }).click();
   await expect(page.getByTestId("brickify-status")).toContainText(/Generated/);
@@ -23,6 +25,7 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(state.resultTriangles).toBeGreaterThan(0);
   expect(state.downloadReady).toBe(true);
   expect(state.dimensions.studFeatureDepth).toBeCloseTo(state.dimensions.studHeight + 0.15, 5);
+  expect(state.dimensions.minimumMountDepth).toBeCloseTo(UNIT, 5);
   expect(state.splitInfo.kept.length).toBe(2);
   expect(state.plane.autoRotate).toBe(false);
   expect(state.plane.visible).toBe(false);
@@ -77,6 +80,8 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
 
   await expect(page.locator("#downloadLink")).toHaveAttribute("aria-disabled", "false");
   await expect(page.locator("#downloadLink")).toHaveAttribute("href", /^blob:/);
+  await expect(page.getByRole("button", { name: "Move Plane" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Rotate Plane" })).toBeHidden();
 
   const stlBytes = await downloadBinaryStl(page);
   const firstPart = state.resultPartBounds[0];
@@ -87,6 +92,14 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(firstSolidZ(stlBytes, centerX + HALF_UNIT, centerY + HALF_UNIT)).toBeGreaterThan(featureDepth - 0.3);
   expect(firstSolidZ(stlBytes, centerX + HALF_UNIT + 6, centerY + HALF_UNIT)).toBeLessThan(0.35);
   expect(firstSolidZ(stlBytes, centerX + HALF_UNIT + 7.15, centerY + HALF_UNIT)).toBeGreaterThan(featureDepth - 0.3);
+  const firstPartStats = state.splitInfo.featureStats[state.resultPartNames[0]];
+  const partOffset = [
+    firstPart.min[0] - firstPartStats.bounds.min[0],
+    firstPart.min[1] - firstPartStats.bounds.min[1]
+  ];
+  const boundaryStud = farthestCenter(firstPartStats.studCenters, firstPartStats.bounds);
+  expect(firstSolidZ(stlBytes, boundaryStud[0] + partOffset[0], boundaryStud[1] + partOffset[1]))
+    .toBeGreaterThan(featureDepth - 0.3);
 
   await expect(page.locator("#resultPartSelect")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete Selected" })).toBeDisabled();
@@ -107,6 +120,20 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(afterReset.resultLoaded).toBe(false);
   expect(afterReset.viewMode).toBe("source");
   expect(afterReset.plane.visible).toBe(true);
+  await expect(page.getByRole("button", { name: "Move Plane" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rotate Plane" })).toBeVisible();
+
+  await page.locator("#planeZ").evaluate((input) => {
+    input.value = "10";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await page.getByRole("button", { name: "Cut D-Brick Mounts" }).click();
+  await expect(page.getByTestId("brickify-status")).toContainText(/Generated/);
+  const shallowCut = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(shallowCut.splitInfo.kept).toEqual(["front"]);
+  expect(shallowCut.splitInfo.discarded).toEqual(["back"]);
+  expect(shallowCut.splitInfo.backDepth).toBeLessThan(shallowCut.splitInfo.requiredDepth);
+  expect(shallowCut.resultPartBounds.length).toBe(1);
 });
 
 async function clickResultPart(page) {
@@ -168,6 +195,15 @@ function gridValues(min, max, spacing, offset) {
 
 function centerKeys(centers) {
   return centers.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`);
+}
+
+function farthestCenter(centers, bounds) {
+  const centerX = (bounds.min[0] + bounds.max[0]) / 2;
+  const centerY = (bounds.min[1] + bounds.max[1]) / 2;
+  return [...centers].sort((a, b) =>
+    Math.hypot(b[0] - centerX, b[1] - centerY) -
+    Math.hypot(a[0] - centerX, a[1] - centerY)
+  )[0];
 }
 
 function expectedPartialAntiStudCenters(centers, bounds) {
@@ -243,11 +279,12 @@ test("renders a nonblank preview and can switch between source and result", asyn
   const cameraBeforeDrag = await page.evaluate(() => window.__everythingABrick.getState().camera);
   expect(cameraBeforeDrag.damping).toBe(false);
   const canvas = page.locator("#brickCanvas");
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
-  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5);
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.2);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height * 0.35, { steps: 12 });
+  await page.mouse.move(box.x + box.width * 0.2, box.y + box.height * 0.8, { steps: 12 });
   await page.mouse.up();
   await page.waitForTimeout(700);
   const cameraAfterDrag = await page.evaluate(() => window.__everythingABrick.getState().camera);
