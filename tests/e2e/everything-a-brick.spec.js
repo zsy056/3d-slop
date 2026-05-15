@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const UNIT = 15.88;
 const HALF_UNIT = UNIT / 2;
-const STUD_OPENING_RADIUS = 4.72;
+const STUD_OPENING_RADIUS = 4.85;
+const ANTI_STUD_RING_OUTER_RADIUS = 6.43;
 const ANTI_STUD_TOOL_RADIUS = 7.8;
 
 test("cuts safe d-brick mounts into the demo mesh and explodes the result", async ({ page }) => {
@@ -25,6 +26,9 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(state.resultTriangles).toBeGreaterThan(0);
   expect(state.downloadReady).toBe(true);
   expect(state.dimensions.studFeatureDepth).toBeCloseTo(state.dimensions.studHeight + 0.15, 5);
+  expect(state.dimensions.studOpeningRadius).toBeCloseTo(STUD_OPENING_RADIUS, 5);
+  expect(state.dimensions.antiStudRingOuterRadius).toBeCloseTo(ANTI_STUD_RING_OUTER_RADIUS, 5);
+  expect(state.dimensions.antiStudToolRadius).toBeCloseTo(ANTI_STUD_TOOL_RADIUS, 5);
   expect(state.dimensions.minimumMountDepth).toBeCloseTo(UNIT, 5);
   expect(state.splitInfo.kept.length).toBe(2);
   expect(state.plane.autoRotate).toBe(false);

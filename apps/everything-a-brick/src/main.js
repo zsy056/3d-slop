@@ -12,7 +12,10 @@ const D = {
   studHeightClearance: 0.15,
   antiStudOuterRadius: 6.55,
   antiStudWall: 1,
-  featureClearance: 1.25
+  featureClearance: 1.25,
+  // Fit reliefs for generated-on-generated mounts; nominal dimensions stay above.
+  studOpeningClearance: 0.18,
+  antiStudClampRelief: 0.12
 };
 
 const EPSILON = 0.08;
@@ -157,6 +160,9 @@ window.__everythingABrick = {
       studHeight: D.studHeight,
       studHeightClearance: D.studHeightClearance,
       studFeatureDepth: studFeatureDepth(),
+      studOpeningRadius: studOpeningRadius(),
+      antiStudRingOuterRadius: antiStudRingOuterRadius(),
+      antiStudToolRadius: antiStudToolRadius(),
       minimumMountDepth: minimumMountDepth()
     },
     plane: planeState(),
@@ -695,8 +701,8 @@ function clipToFeatureDepth(localPart, depth) {
 function antiStudPocket(height, center) {
   const pocket = Manifold.cylinder(
     height + EPSILON,
-    D.antiStudOuterRadius + D.featureClearance,
-    D.antiStudOuterRadius + D.featureClearance,
+    antiStudToolRadius(),
+    antiStudToolRadius(),
     72
   ).translate([0, 0, -EPSILON]);
   const ring = antiStudRing(height + EPSILON, [0, 0, -EPSILON]);
@@ -704,11 +710,13 @@ function antiStudPocket(height, center) {
 }
 
 function antiStudRing(height, center) {
-  const outer = Manifold.cylinder(height, D.antiStudOuterRadius, D.antiStudOuterRadius, 72);
+  const outerRadius = antiStudRingOuterRadius();
+  const innerRadius = antiStudRingInnerRadius();
+  const outer = Manifold.cylinder(height, outerRadius, outerRadius, 72);
   const inner = Manifold.cylinder(
     height + EPSILON * 4,
-    D.antiStudOuterRadius - D.antiStudWall,
-    D.antiStudOuterRadius - D.antiStudWall,
+    innerRadius,
+    innerRadius,
     72
   ).translate([0, 0, -EPSILON * 2]);
   return outer.subtract(inner).translate(center);
@@ -721,7 +729,15 @@ function studOpening(depth, center) {
 }
 
 function studOpeningRadius() {
-  return D.studRadius + 0.05;
+  return D.studRadius + D.studOpeningClearance;
+}
+
+function antiStudRingOuterRadius() {
+  return Math.max(antiStudRingInnerRadius() + 0.3, D.antiStudOuterRadius - D.antiStudClampRelief);
+}
+
+function antiStudRingInnerRadius() {
+  return D.antiStudOuterRadius - D.antiStudWall;
 }
 
 function antiStudToolRadius() {
@@ -1001,7 +1017,7 @@ function updatePlaneHelper() {
 
   for (const center of antiStudCenters) {
     addPlaneCircle(center, antiStudToolRadius(), 0xb7ff3c, 0.4, 0.3);
-    addPlaneCircle(center, D.antiStudOuterRadius - D.antiStudWall, 0xb7ff3c, 0.58, 0.32);
+    addPlaneCircle(center, antiStudRingInnerRadius(), 0xb7ff3c, 0.58, 0.32);
   }
 
   for (const center of studCenters) {
