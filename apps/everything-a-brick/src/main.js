@@ -14,6 +14,8 @@ const D = {
   antiStudWall: 1,
   featureClearance: 1.25,
   minimumShellWall: 3.2,
+  fallbackClampRibWidth: 2.8,
+  fallbackClampRibBite: 0.45,
   // Fit reliefs for generated-on-generated mounts; nominal dimensions stay above.
   studOpeningClearance: 0.18,
   antiStudClampRelief: 0.12
@@ -165,6 +167,7 @@ window.__everythingABrick = {
       antiStudRingOuterRadius: antiStudRingOuterRadius(),
       antiStudToolRadius: antiStudToolRadius(),
       minimumShellWall: exteriorSkinThickness(),
+      fallbackClampRibWidth: fallbackClampRibWidth(),
       minimumMountDepth: minimumMountDepth()
     },
     plane: planeState(),
@@ -595,6 +598,11 @@ function makeMountCutter(localPart) {
     studOpeningRadius()
   );
   const partialAntiStudCenters = findPartialAntiStudCenters(antiStudCenters, face);
+  const fallbackClampRibBoxes = antiStudCenters.length ? [] : fallbackClampRibs(bounds, studCenters);
+  const fallbackClampRibKeepers = fallbackClampRibBoxes.map((box) => ribKeeper(box, depth + EPSILON));
+  const clampPattern = antiStudCenters.length ?
+    "sparse-center-cross" :
+    fallbackClampRibKeepers.length ? "sparse-wall-ribs" : "none";
   const cutterParts = [];
 
   const cavityCutter = interiorCavityCutter(localPart, depth);
@@ -604,6 +612,9 @@ function makeMountCutter(localPart) {
       hollowingCutter = hollowingCutter.subtract(
         combine(antiStudCenters.map((center) => antiStudRing(depth + EPSILON, [center[0], center[1], -EPSILON])))
       );
+    }
+    if (fallbackClampRibKeepers.length) {
+      hollowingCutter = hollowingCutter.subtract(combine(fallbackClampRibKeepers));
     }
 
     if (!hollowingCutter.isEmpty()) {
@@ -618,8 +629,9 @@ function makeMountCutter(localPart) {
   return {
     cutter: cutterParts.length ? combine(cutterParts) : null,
     features: {
-      clampPattern: "sparse-center-cross",
+      clampPattern,
       antiStuds: antiStudCenters.length,
+      fallbackClampRibs: fallbackClampRibKeepers.length,
       partialAntiStuds: partialAntiStudCenters.length,
       edgeWallRestores: 0,
       studOpenings: studCenters.length,
@@ -722,6 +734,120 @@ function closestGridValue(values, target) {
 
 function sameGridValue(a, b) {
   return Math.abs(a - b) < 1e-5;
+}
+
+function fallbackClampRibs(bounds, studCenters) {
+  return fallbackClampStudTargets(studCenters, bounds)
+    .flatMap((center) => wallGrownClampRibBoxes(center, bounds));
+}
+
+function fallbackClampStudTargets(studCenters, bounds) {
+  const center = boundsCenter(bounds);
+  const inside = studCenters.filter((studCenter) => pointInsideBounds(studCenter, bounds));
+  const candidates = inside.length ?
+    inside :
+    studCenters.filter((studCenter) => circleOverlapsBounds(studCenter, studOpeningRadius(), bounds));
+
+  return [...candidates]
+    .sort((a, b) =>
+      distance2d(a, center) - distance2d(b, center)
+    )
+    .slice(0, 4);
+}
+
+function wallGrownClampRibBoxes([x, y], bounds) {
+  const width = fallbackClampRibWidth();
+  const bite = D.fallbackClampRibBite;
+  const radius = studOpeningRadius();
+  const boxes = [];
+  const minLength = 0.8;
+
+  pushRibBox(
+    boxes,
+    x + radius - bite,
+    bounds.max[0] + EPSILON,
+    y - width / 2,
+    y + width / 2,
+    bounds,
+    minLength
+  );
+  pushRibBox(
+    boxes,
+    bounds.min[0] - EPSILON,
+    x - radius + bite,
+    y - width / 2,
+    y + width / 2,
+    bounds,
+    minLength
+  );
+  pushRibBox(
+    boxes,
+    x - width / 2,
+    x + width / 2,
+    y + radius - bite,
+    bounds.max[1] + EPSILON,
+    bounds,
+    minLength
+  );
+  pushRibBox(
+    boxes,
+    x - width / 2,
+    x + width / 2,
+    bounds.min[1] - EPSILON,
+    y - radius + bite,
+    bounds,
+    minLength
+  );
+
+  return boxes;
+}
+
+function pushRibBox(boxes, minX, maxX, minY, maxY, bounds, minLength) {
+  const clamped = {
+    minX: Math.max(bounds.min[0] - EPSILON, Math.min(minX, maxX)),
+    maxX: Math.min(bounds.max[0] + EPSILON, Math.max(minX, maxX)),
+    minY: Math.max(bounds.min[1] - EPSILON, Math.min(minY, maxY)),
+    maxY: Math.min(bounds.max[1] + EPSILON, Math.max(minY, maxY))
+  };
+  if (clamped.maxX - clamped.minX >= minLength && clamped.maxY - clamped.minY >= minLength) {
+    boxes.push(clamped);
+  }
+}
+
+function ribKeeper(box, depth) {
+  return Manifold.cube([
+    box.maxX - box.minX,
+    box.maxY - box.minY,
+    depth + EPSILON
+  ]).translate([box.minX, box.minY, -EPSILON]);
+}
+
+function fallbackClampRibWidth() {
+  return Math.max(2.4, D.fallbackClampRibWidth);
+}
+
+function boundsCenter(bounds) {
+  return [
+    (bounds.min[0] + bounds.max[0]) / 2,
+    (bounds.min[1] + bounds.max[1]) / 2
+  ];
+}
+
+function pointInsideBounds([x, y], bounds) {
+  return x >= bounds.min[0] &&
+    x <= bounds.max[0] &&
+    y >= bounds.min[1] &&
+    y <= bounds.max[1];
+}
+
+function circleOverlapsBounds([x, y], radius, bounds) {
+  const nearestX = Math.max(bounds.min[0], Math.min(bounds.max[0], x));
+  const nearestY = Math.max(bounds.min[1], Math.min(bounds.max[1], y));
+  return Math.hypot(x - nearestX, y - nearestY) <= radius;
+}
+
+function distance2d(a, b) {
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
 }
 
 function interiorCavityCutter(localPart, depth) {
@@ -1084,6 +1210,10 @@ function updatePlaneHelper() {
     bounds
   );
   const studCenters = gridCentersForBounds(bounds, studOffsets[0], studOffsets[1], studOpeningRadius());
+  const fallbackClampRibCount = antiStudCenters.length ? 0 : fallbackClampRibs(bounds, studCenters).length;
+  const clampPattern = antiStudCenters.length ?
+    "sparse-center-cross" :
+    fallbackClampRibCount ? "sparse-wall-ribs" : "none";
 
   for (const center of antiStudCenters) {
     addPlaneCircle(center, antiStudToolRadius(), 0xb7ff3c, 0.4, 0.3);
@@ -1101,8 +1231,9 @@ function updatePlaneHelper() {
     },
     antiStudOffset: antiStudOffsets,
     studOffset: studOffsets,
-    clampPattern: "sparse-center-cross",
+    clampPattern,
     antiStudRings: antiStudCenters.length,
+    fallbackClampRibs: fallbackClampRibCount,
     studOpenings: studCenters.length,
     antiStudCenters,
     studCenters,

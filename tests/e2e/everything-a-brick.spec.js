@@ -143,6 +143,55 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(shallowCut.resultPartBounds.length).toBe(1);
 });
 
+test("uses wall-rib fallback when full anti-stud rings do not fit", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+
+  await page.setInputFiles("#stlFile", {
+    name: "tiny-box.stl",
+    mimeType: "model/stl",
+    buffer: tinyBoxStlBuffer(24, 24, 32)
+  });
+  await expect(page.locator("#modelTitle")).toHaveText("tiny-box");
+
+  const loaded = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(loaded.planePreview.antiStudRings).toBe(0);
+  expect(loaded.planePreview.fallbackClampRibs).toBeGreaterThan(0);
+  expect(loaded.planePreview.clampPattern).toBe("sparse-wall-ribs");
+  expect(loaded.dimensions.fallbackClampRibWidth).toBeCloseTo(2.8, 5);
+
+  await page.getByRole("button", { name: "Cut D-Brick Mounts" }).click();
+  await expect(page.getByTestId("brickify-status")).toContainText(/Generated/);
+
+  const state = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(state.resultLoaded).toBe(true);
+  expect(state.splitInfo.kept.length).toBeGreaterThan(0);
+
+  const firstPartName = state.resultPartNames[0];
+  const stats = state.splitInfo.featureStats[firstPartName];
+  expect(stats.clampPattern).toBe("sparse-wall-ribs");
+  expect(stats.antiStuds).toBe(0);
+  expect(stats.fallbackClampRibs).toBeGreaterThan(0);
+  expect(stats.studOpenings).toBeGreaterThan(0);
+
+  const stlBytes = await downloadBinaryStl(page);
+  const firstPart = state.resultPartBounds[0];
+  const partOffset = [
+    firstPart.min[0] - stats.bounds.min[0],
+    firstPart.min[1] - stats.bounds.min[1]
+  ];
+  const centerStud = closestCenter(stats.studCenters, stats.bounds);
+  const centerX = centerStud[0] + partOffset[0];
+  const centerY = centerStud[1] + partOffset[1];
+
+  expect(firstSolidZ(stlBytes, centerX, centerY))
+    .toBeGreaterThan(state.dimensions.studFeatureDepth - 0.3);
+  expect(firstSolidZ(stlBytes, centerX + STUD_OPENING_RADIUS + 1.1, centerY))
+    .toBeLessThan(0.35);
+  expect(firstSolidZ(stlBytes, centerX, centerY + STUD_OPENING_RADIUS + 1.1))
+    .toBeLessThan(0.35);
+});
+
 async function clickResultPart(page) {
   const canvas = page.locator("#brickCanvas");
   const box = await canvas.boundingBox();
@@ -178,6 +227,41 @@ async function downloadBinaryStl(page) {
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });
   return Uint8Array.from(bytes);
+}
+
+function tinyBoxStlBuffer(width, depth, height) {
+  const x0 = -width / 2;
+  const x1 = width / 2;
+  const y0 = -depth / 2;
+  const y1 = depth / 2;
+  const z0 = 0;
+  const z1 = height;
+  const triangles = [
+    [[x0, y0, z0], [x1, y1, z0], [x1, y0, z0]],
+    [[x0, y0, z0], [x0, y1, z0], [x1, y1, z0]],
+    [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1]],
+    [[x0, y0, z1], [x1, y1, z1], [x0, y1, z1]],
+    [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1]],
+    [[x0, y0, z0], [x1, y0, z1], [x0, y0, z1]],
+    [[x0, y1, z0], [x1, y1, z1], [x1, y1, z0]],
+    [[x0, y1, z0], [x0, y1, z1], [x1, y1, z1]],
+    [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1]],
+    [[x0, y0, z0], [x0, y1, z1], [x0, y1, z0]],
+    [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1]],
+    [[x1, y0, z0], [x1, y1, z1], [x1, y0, z1]]
+  ];
+
+  return Buffer.from([
+    "solid tiny-box",
+    ...triangles.map((triangle) => [
+      "  facet normal 0 0 0",
+      "    outer loop",
+      ...triangle.map(([x, y, z]) => `      vertex ${x} ${y} ${z}`),
+      "    endloop",
+      "  endfacet"
+    ].join("\n")),
+    "endsolid tiny-box"
+  ].join("\n"));
 }
 
 function expectedGridCenters(bounds, offsetX, offsetY, margin) {
