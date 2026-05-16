@@ -2,8 +2,8 @@
 // Dbricks Cake Generator
 //
 // Reuses the top stud geometry from dbricks_generator_v4.scad. The underside is
-// a hollow round shell with original-style anti-stud cylinders placed at the
-// reinforcement-wall intersections used by the previous bottom grid.
+// a hollow round shell with a sparse anti-stud pattern placed on selected
+// reinforcement-wall intersections, because a full grid was too enthusiastic.
 //
 
 use <dbricks_generator_v4.scad>
@@ -81,7 +81,10 @@ Bottom_compatible = 1; // [0:No, 1:Yes]
 Partial_stud_reliefs = 1; // [0:No, 1:Yes]
 
 // Add clipped anti-stud tubes around the round edge where the tube lattice overlaps.
-Edge_partial_tubes = 1; // [0:No, 1:Yes]
+Edge_partial_tubes = 0; // [0:No, 1:Yes]
+
+// Use fewer bottom anti-stud tubes so the part can find alignment before it grips.
+Sparse_bottom_clamps = 1; // [0:Dense legacy grid, 1:Sparse center-cross grid]
 
 // Add short wall sockets under full studs on cake slices for better clutch.
 Slice_bottom_stud_clutches = 1; // [0:No, 1:Yes]
@@ -668,6 +671,17 @@ function clutch_tube_position(index, diameter_studs) =
     (index - (diameter_studs - 2) / 2) * base_unit;
 
 
+function sparse_clutch_axis_index(diameter_studs) =
+    floor((diameter_studs - 1) / 2);
+
+
+function sparse_clutch_tube_candidate(ix, iy, diameter_studs) =
+    Sparse_bottom_clamps == 0 ||
+    diameter_studs <= 2 ||
+    ix == sparse_clutch_axis_index(diameter_studs) ||
+    iy == sparse_clutch_axis_index(diameter_studs);
+
+
 module bottom_original_internal_cylinders(
     diameter_studs,
     inner_radius,
@@ -682,7 +696,8 @@ module bottom_original_internal_cylinders(
             x = clutch_tube_position(ix, diameter_studs);
             y = clutch_tube_position(iy, diameter_studs);
             full_tube = inside_round_footprint(x, y, inner_radius, cyl_radius);
-            partial_tube = allow_partial_tubes &&
+            partial_tube = Sparse_bottom_clamps == 0 &&
+                allow_partial_tubes &&
                 overlaps_round_footprint(x, y, inner_radius, cyl_radius);
             fits_slice = anti_stud_tube_fits_slice(
                 x,
@@ -691,7 +706,11 @@ module bottom_original_internal_cylinders(
                 slice_rotation_degrees
             );
 
-            if ((full_tube || partial_tube) && fits_slice) {
+            if (
+                sparse_clutch_tube_candidate(ix, iy, diameter_studs) &&
+                (full_tube || partial_tube) &&
+                fits_slice
+            ) {
                 original_internal_cylinder(x, y, clutch_height, support);
             }
         }

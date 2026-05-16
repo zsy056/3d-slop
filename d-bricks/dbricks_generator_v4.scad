@@ -47,8 +47,8 @@ Height_factor = 0.5;
 // Brick type
 Type = 0; //[0:Normal Brick, 1:Base Plate]
 
-// have less bottom circle for larger blocks
-Sparse_bottom = 0; //[0:Normal Brick, 1:less bottom circles]
+// Use a sparse bottom tube pattern on larger blocks for easier self-alignment.
+Sparse_bottom = 1; //[0:Full tube grid, 1:Sparse center-cross grid]
 
 /* [Advanced] */
 // Studs type
@@ -115,7 +115,7 @@ function top_stud_radius() =
 brick(X_size, Y_size, Height_factor, Studs,Type,Sparse_bottom);
 //stud_extruded((base_unit/2) + r * base_unit, base_unit/2 + c * base_unit, height, stud_radius);
 
-module brick(nx, ny, heightfact, stud_type=3,type=0,sparse_bottom=0) {
+module brick(nx, ny, heightfact, stud_type=3,type=0,sparse_bottom=1) {
 if (type==0){
 	standard_brick(nx,ny,heightfact,stud_type,sparse_bottom);
 	} else {
@@ -187,10 +187,14 @@ module standard_brick(nx, ny, heightfact, stud_type=3, sparse_bottom=1) {
 
 		// Internal cylinders
 		if (nx > 1 && ny > 1) for(r=[1:nx-1]) for(c=[1:ny-1]) {
-            if( (((r+c)%2) == 0) || (sparse_bottom == 0)) {
-			internal_cyl(base_unit * r, base_unit * c, hollow_height - roof_thickness + 0.1,
-					hollow_height >= std_height ? 1 : 0);
-            }
+			if (sparse_bottom == 0 || sparse_bottom_tube_candidate(r, c, nx, ny)) {
+				internal_cyl(
+					base_unit * r,
+					base_unit * c,
+					hollow_height - roof_thickness + 0.1,
+					hollow_height >= std_height ? 1 : 0
+				);
+			}
 		}
 
 		//internal wall and ridges for width/height of 1
@@ -211,6 +215,13 @@ module standard_brick(nx, ny, heightfact, stud_type=3, sparse_bottom=1) {
 		ridgeset(dx, 0, 90, ny, hollow_height);
 	}
 }
+
+function sparse_bottom_axis_index(n) = floor(n / 2);
+
+function sparse_bottom_tube_candidate(r, c, nx, ny) =
+	(nx <= 2 || ny <= 2) ||
+	r == sparse_bottom_axis_index(nx) ||
+	c == sparse_bottom_axis_index(ny);
 
 module stud(x, y, z, r){
 	translate(v=[x, y, 1.875 + z]){

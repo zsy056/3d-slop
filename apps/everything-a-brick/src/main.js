@@ -13,6 +13,7 @@ const D = {
   antiStudOuterRadius: 6.55,
   antiStudWall: 1,
   featureClearance: 1.25,
+  minimumShellWall: 3.2,
   // Fit reliefs for generated-on-generated mounts; nominal dimensions stay above.
   studOpeningClearance: 0.18,
   antiStudClampRelief: 0.12
@@ -163,6 +164,7 @@ window.__everythingABrick = {
       studOpeningRadius: studOpeningRadius(),
       antiStudRingOuterRadius: antiStudRingOuterRadius(),
       antiStudToolRadius: antiStudToolRadius(),
+      minimumShellWall: exteriorSkinThickness(),
       minimumMountDepth: minimumMountDepth()
     },
     plane: planeState(),
@@ -581,11 +583,10 @@ function makeMountCutter(localPart) {
   const face = mountPatternFace(localPart);
   const bounds = face.bounds;
   const depth = studFeatureDepth();
-  const antiStudCenters = gridCentersForBounds(
-    bounds,
-    D.unit / 2,
-    D.unit / 2,
-    antiStudToolRadius()
+  const antiStudCenters = sparseClampCenters(
+    gridCentersForBounds(bounds, D.unit / 2, D.unit / 2)
+      .filter((center) => circleFitsMountFace(center, antiStudToolRadius(), face)),
+    bounds
   );
   const studCenters = gridCentersForBounds(
     bounds,
@@ -594,19 +595,22 @@ function makeMountCutter(localPart) {
     studOpeningRadius()
   );
   const partialAntiStudCenters = findPartialAntiStudCenters(antiStudCenters, face);
-  const exteriorKeepOut = exteriorSurfaceKeepOut(localPart, depth);
   const cutterParts = [];
-  if (antiStudCenters.length) {
-    let antiStudCutter = combine(
-      antiStudCenters.map((center) => antiStudPocket(depth, [center[0], center[1], 0]))
-    );
-    if (exteriorKeepOut) {
-      antiStudCutter = antiStudCutter.subtract(exteriorKeepOut);
+
+  const cavityCutter = interiorCavityCutter(localPart, depth);
+  if (cavityCutter) {
+    let hollowingCutter = cavityCutter;
+    if (antiStudCenters.length) {
+      hollowingCutter = hollowingCutter.subtract(
+        combine(antiStudCenters.map((center) => antiStudRing(depth + EPSILON, [center[0], center[1], -EPSILON])))
+      );
     }
-    if (!antiStudCutter.isEmpty()) {
-      cutterParts.push(antiStudCutter);
+
+    if (!hollowingCutter.isEmpty()) {
+      cutterParts.push(hollowingCutter);
     }
   }
+
   if (studCenters.length) {
     cutterParts.push(combine(studCenters.map((center) => studOpening(depth, center))));
   }
@@ -614,9 +618,10 @@ function makeMountCutter(localPart) {
   return {
     cutter: cutterParts.length ? combine(cutterParts) : null,
     features: {
+      clampPattern: "sparse-center-cross",
       antiStuds: antiStudCenters.length,
       partialAntiStuds: partialAntiStudCenters.length,
-      edgeWallRestores: exteriorKeepOut ? partialAntiStudCenters.length : 0,
+      edgeWallRestores: 0,
       studOpenings: studCenters.length,
       antiStudCenters,
       partialAntiStudCenters,
@@ -666,6 +671,72 @@ function findPartialAntiStudCenters(centers, face) {
     const overlapArea = face.section.intersect(toolCircle.translate(center)).area();
     return overlapArea > partialAreaTolerance && overlapArea < fullArea - partialAreaTolerance;
   });
+}
+
+function circleFitsMountFace(center, radius, face) {
+  if (!face.section || face.section.isEmpty()) {
+    return circleFitsBounds(center, radius, face.bounds);
+  }
+
+  const toolCircle = CrossSection.circle(radius, 72);
+  const fullArea = toolCircle.area();
+  const overlapArea = face.section.intersect(toolCircle.translate(center)).area();
+  return overlapArea >= fullArea - 0.35;
+}
+
+function sparseClampCenters(centers, bounds) {
+  if (centers.length <= 3) {
+    return centers;
+  }
+
+  const xs = uniqueSortedGridValues(centers.map(([x]) => x));
+  const ys = uniqueSortedGridValues(centers.map(([, y]) => y));
+  if (xs.length <= 1 || ys.length <= 1) {
+    return centers;
+  }
+
+  const centerX = (bounds.min[0] + bounds.max[0]) / 2;
+  const centerY = (bounds.min[1] + bounds.max[1]) / 2;
+  const crossX = closestGridValue(xs, centerX);
+  const crossY = closestGridValue(ys, centerY);
+
+  return centers.filter(([x, y]) =>
+    sameGridValue(x, crossX) ||
+    sameGridValue(y, crossY)
+  );
+}
+
+function uniqueSortedGridValues(values) {
+  return [...new Set(values.map((value) => value.toFixed(5)))]
+    .map(Number)
+    .sort((a, b) => a - b);
+}
+
+function closestGridValue(values, target) {
+  return values.reduce((closest, value) => {
+    const closestDistance = Math.abs(closest - target);
+    const distance = Math.abs(value - target);
+    return distance < closestDistance ? value : closest;
+  }, values[0]);
+}
+
+function sameGridValue(a, b) {
+  return Math.abs(a - b) < 1e-5;
+}
+
+function interiorCavityCutter(localPart, depth) {
+  const depthPart = clipToFeatureDepth(localPart, depth);
+  if (depthPart.isEmpty()) {
+    return null;
+  }
+
+  const exteriorKeepOut = exteriorSurfaceKeepOut(localPart, depth);
+  if (!exteriorKeepOut || exteriorKeepOut.isEmpty()) {
+    return depthPart;
+  }
+
+  const cavity = depthPart.subtract(exteriorKeepOut);
+  return cavity.isEmpty() ? null : cavity;
 }
 
 function exteriorSurfaceKeepOut(localPart, depth) {
@@ -745,7 +816,7 @@ function antiStudToolRadius() {
 }
 
 function exteriorSkinThickness() {
-  return Math.max(1.8, D.antiStudWall + 0.8);
+  return Math.max(D.minimumShellWall, D.antiStudWall + 2.2);
 }
 
 function studFeatureDepth() {
@@ -1007,11 +1078,10 @@ function updatePlaneHelper() {
 
   const antiStudOffsets = [D.unit / 2, D.unit / 2];
   const studOffsets = [0, 0];
-  const antiStudCenters = gridCentersForBounds(
-    bounds,
-    antiStudOffsets[0],
-    antiStudOffsets[1],
-    antiStudToolRadius()
+  const antiStudCenters = sparseClampCenters(
+    gridCentersForBounds(bounds, antiStudOffsets[0], antiStudOffsets[1])
+      .filter((center) => circleFitsBounds(center, antiStudToolRadius(), bounds)),
+    bounds
   );
   const studCenters = gridCentersForBounds(bounds, studOffsets[0], studOffsets[1], studOpeningRadius());
 
@@ -1031,6 +1101,7 @@ function updatePlaneHelper() {
     },
     antiStudOffset: antiStudOffsets,
     studOffset: studOffsets,
+    clampPattern: "sparse-center-cross",
     antiStudRings: antiStudCenters.length,
     studOpenings: studCenters.length,
     antiStudCenters,
@@ -1201,9 +1272,9 @@ function updateStats() {
   if (state.planePreview) {
     const width = state.planePreview.bounds.max[0] - state.planePreview.bounds.min[0];
     const depth = state.planePreview.bounds.max[1] - state.planePreview.bounds.min[1];
-    els.footprintStat.textContent = `Auto grid, ${formatMm(width)} x ${formatMm(depth)} mm; ${formatMm(studFeatureDepth())} mm deep`;
+    els.footprintStat.textContent = `Sparse grid, ${formatMm(width)} x ${formatMm(depth)} mm; ${formatMm(studFeatureDepth())} mm deep`;
   } else {
-    els.footprintStat.textContent = `Auto grid; ${formatMm(studFeatureDepth())} mm deep`;
+    els.footprintStat.textContent = `Sparse grid; ${formatMm(studFeatureDepth())} mm deep`;
   }
   els.sourceStat.textContent = state.sourceManifold ? `${state.sourceTriangles.toLocaleString()} triangles` : "-";
   els.resultStat.textContent = state.resultManifold ? resultStatText() : "Not yet cut.";

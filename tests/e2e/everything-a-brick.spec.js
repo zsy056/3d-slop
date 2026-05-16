@@ -5,6 +5,7 @@ const HALF_UNIT = UNIT / 2;
 const STUD_OPENING_RADIUS = 4.85;
 const ANTI_STUD_RING_OUTER_RADIUS = 6.43;
 const ANTI_STUD_TOOL_RADIUS = 7.8;
+const MINIMUM_SHELL_WALL = 3.2;
 
 test("cuts safe d-brick mounts into the demo mesh and explodes the result", async ({ page }) => {
   await page.goto("/");
@@ -29,6 +30,7 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   expect(state.dimensions.studOpeningRadius).toBeCloseTo(STUD_OPENING_RADIUS, 5);
   expect(state.dimensions.antiStudRingOuterRadius).toBeCloseTo(ANTI_STUD_RING_OUTER_RADIUS, 5);
   expect(state.dimensions.antiStudToolRadius).toBeCloseTo(ANTI_STUD_TOOL_RADIUS, 5);
+  expect(state.dimensions.minimumShellWall).toBeCloseTo(MINIMUM_SHELL_WALL, 5);
   expect(state.dimensions.minimumMountDepth).toBeCloseTo(UNIT, 5);
   expect(state.splitInfo.kept.length).toBe(2);
   expect(state.plane.autoRotate).toBe(false);
@@ -56,21 +58,14 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
         studOpenings: sum.studOpenings + stats.studOpenings
       }), { antiStuds: 0, partialAntiStuds: 0, edgeWallRestores: 0, studOpenings: 0 });
   expect(featureTotals.antiStuds).toBeGreaterThan(0);
-  expect(featureTotals.partialAntiStuds).toBeGreaterThan(0);
-  expect(featureTotals.edgeWallRestores).toBe(featureTotals.partialAntiStuds);
+  expect(featureTotals.partialAntiStuds).toBe(0);
+  expect(featureTotals.edgeWallRestores).toBe(0);
   expect(featureTotals.studOpenings).toBeGreaterThan(0);
   for (const stats of Object.values(state.splitInfo.featureStats)) {
-    expect(centerKeys(stats.antiStudCenters)).toEqual(centerKeys(expectedGridCenters(
-      stats.bounds,
-      HALF_UNIT,
-      HALF_UNIT,
-      ANTI_STUD_TOOL_RADIUS
-    )));
-    expect(centerKeys(stats.partialAntiStudCenters)).toEqual(centerKeys(expectedPartialAntiStudCenters(
-      stats.antiStudCenters,
-      stats.bounds
-    )));
-    expect(stats.edgeWallRestores).toBe(stats.partialAntiStuds);
+    expect(stats.clampPattern).toBe("sparse-center-cross");
+    expect(centerKeys(stats.antiStudCenters)).toEqual(centerKeys(expectedSparseAntiStudCenters(stats.bounds)));
+    expect(stats.partialAntiStudCenters).toEqual([]);
+    expect(stats.edgeWallRestores).toBe(0);
     expect(centerKeys(stats.studCenters)).toEqual(centerKeys(expectedGridCenters(
       stats.bounds,
       0,
@@ -92,15 +87,23 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
   const centerX = (firstPart.min[0] + firstPart.max[0]) / 2;
   const centerY = (firstPart.min[1] + firstPart.max[1]) / 2;
   const featureDepth = state.dimensions.studFeatureDepth;
-  expect(firstSolidZ(stlBytes, centerX, centerY)).toBeGreaterThan(featureDepth - 0.3);
-  expect(firstSolidZ(stlBytes, centerX + HALF_UNIT, centerY + HALF_UNIT)).toBeGreaterThan(featureDepth - 0.3);
-  expect(firstSolidZ(stlBytes, centerX + HALF_UNIT + 6, centerY + HALF_UNIT)).toBeLessThan(0.35);
-  expect(firstSolidZ(stlBytes, centerX + HALF_UNIT + 7.15, centerY + HALF_UNIT)).toBeGreaterThan(featureDepth - 0.3);
   const firstPartStats = state.splitInfo.featureStats[state.resultPartNames[0]];
   const partOffset = [
     firstPart.min[0] - firstPartStats.bounds.min[0],
     firstPart.min[1] - firstPartStats.bounds.min[1]
   ];
+  const sampleAntiStud = closestCenter(firstPartStats.antiStudCenters, firstPartStats.bounds);
+  const antiStudX = sampleAntiStud[0] + partOffset[0];
+  const antiStudY = sampleAntiStud[1] + partOffset[1];
+  const shellSample = findShellSample(firstPartStats, state.dimensions.minimumShellWall);
+  expect(shellSample).not.toBeNull();
+  const shellX = shellSample[0] + partOffset[0];
+  const shellY = shellSample[1] + partOffset[1];
+  expect(firstSolidZ(stlBytes, centerX, centerY)).toBeGreaterThan(featureDepth - 0.3);
+  expect(firstSolidZ(stlBytes, antiStudX, antiStudY)).toBeGreaterThan(featureDepth - 0.3);
+  expect(firstSolidZ(stlBytes, antiStudX + 6, antiStudY)).toBeLessThan(0.35);
+  expect(firstSolidZ(stlBytes, antiStudX + 7.15, antiStudY)).toBeGreaterThan(featureDepth - 0.3);
+  expect(firstSolidZ(stlBytes, shellX, shellY)).toBeLessThan(0.35);
   const boundaryStud = farthestCenter(firstPartStats.studCenters, firstPartStats.bounds);
   expect(firstSolidZ(stlBytes, boundaryStud[0] + partOffset[0], boundaryStud[1] + partOffset[1]))
     .toBeGreaterThan(featureDepth - 0.3);
@@ -187,6 +190,14 @@ function expectedGridCenters(bounds, offsetX, offsetY, margin) {
   return centers;
 }
 
+function expectedSparseAntiStudCenters(bounds) {
+  return sparseClampCenters(
+    expectedGridCenters(bounds, HALF_UNIT, HALF_UNIT, 0)
+      .filter((center) => circleFitsCircularBounds(center, ANTI_STUD_TOOL_RADIUS, bounds)),
+    bounds
+  );
+}
+
 function gridValues(min, max, spacing, offset) {
   const first = Math.ceil((min - offset) / spacing);
   const last = Math.floor((max - offset) / spacing);
@@ -210,15 +221,93 @@ function farthestCenter(centers, bounds) {
   )[0];
 }
 
-function expectedPartialAntiStudCenters(centers, bounds) {
+function closestCenter(centers, bounds) {
+  const centerX = (bounds.min[0] + bounds.max[0]) / 2;
+  const centerY = (bounds.min[1] + bounds.max[1]) / 2;
+  return [...centers].sort((a, b) =>
+    Math.hypot(a[0] - centerX, a[1] - centerY) -
+    Math.hypot(b[0] - centerX, b[1] - centerY)
+  )[0];
+}
+
+function findShellSample(stats, shellWall) {
+  const centerX = (stats.bounds.min[0] + stats.bounds.max[0]) / 2;
+  const centerY = (stats.bounds.min[1] + stats.bounds.max[1]) / 2;
+  const inset = shellWall / 2;
+  const offsets = [0, UNIT / 2, -UNIT / 2, UNIT / 3, -UNIT / 3, UNIT * 0.7, -UNIT * 0.7];
+  const candidates = [];
+
+  for (const offset of offsets) {
+    candidates.push([stats.bounds.max[0] - inset, centerY + offset]);
+    candidates.push([stats.bounds.min[0] + inset, centerY + offset]);
+    candidates.push([centerX + offset, stats.bounds.max[1] - inset]);
+    candidates.push([centerX + offset, stats.bounds.min[1] + inset]);
+  }
+
+  return candidates.find((candidate) =>
+    pointInsideBounds(candidate, stats.bounds) &&
+    outsideStudOpenings(candidate, stats.studCenters)
+  ) ?? null;
+}
+
+function pointInsideBounds([x, y], bounds) {
+  return x >= bounds.min[0] &&
+    x <= bounds.max[0] &&
+    y >= bounds.min[1] &&
+    y <= bounds.max[1];
+}
+
+function outsideStudOpenings([x, y], studCenters) {
+  return studCenters.every(([studX, studY]) =>
+    Math.hypot(x - studX, y - studY) > STUD_OPENING_RADIUS + 0.8
+  );
+}
+
+function circleFitsCircularBounds(center, toolRadius, bounds) {
   const centerX = (bounds.min[0] + bounds.max[0]) / 2;
   const centerY = (bounds.min[1] + bounds.max[1]) / 2;
   const radius = Math.min(bounds.max[0] - bounds.min[0], bounds.max[1] - bounds.min[1]) / 2;
-  return centers.filter(([x, y]) => {
-    const distance = Math.hypot(x - centerX, y - centerY);
-    return distance < radius + ANTI_STUD_TOOL_RADIUS - 0.1 &&
-      distance + ANTI_STUD_TOOL_RADIUS > radius + 0.1;
-  });
+  return Math.hypot(center[0] - centerX, center[1] - centerY) + toolRadius <= radius - 0.35;
+}
+
+function sparseClampCenters(centers, bounds) {
+  if (centers.length <= 3) {
+    return centers;
+  }
+
+  const xs = uniqueSortedGridValues(centers.map(([x]) => x));
+  const ys = uniqueSortedGridValues(centers.map(([, y]) => y));
+  if (xs.length <= 1 || ys.length <= 1) {
+    return centers;
+  }
+
+  const centerX = (bounds.min[0] + bounds.max[0]) / 2;
+  const centerY = (bounds.min[1] + bounds.max[1]) / 2;
+  const crossX = closestGridValue(xs, centerX);
+  const crossY = closestGridValue(ys, centerY);
+
+  return centers.filter(([x, y]) =>
+    sameGridValue(x, crossX) ||
+    sameGridValue(y, crossY)
+  );
+}
+
+function uniqueSortedGridValues(values) {
+  return [...new Set(values.map((value) => value.toFixed(5)))]
+    .map(Number)
+    .sort((a, b) => a - b);
+}
+
+function closestGridValue(values, target) {
+  return values.reduce((closest, value) => {
+    const closestDistance = Math.abs(closest - target);
+    const distance = Math.abs(value - target);
+    return distance < closestDistance ? value : closest;
+  }, values[0]);
+}
+
+function sameGridValue(a, b) {
+  return Math.abs(a - b) < 1e-5;
 }
 
 function firstSolidZ(bytes, x, y) {
