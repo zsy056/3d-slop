@@ -10,7 +10,11 @@ What worked:
 - Treat slices and round cakes as real footprints, not clipped cubes. Closed radial side walls, center closure, full-stud top placement, and clipped side decorations made the cake generator predictable.
 - Validate visually and mechanically. Top-down underside renders caught ribs that looked fine in code but did not connect to walls. Oblique renders caught height and attachment problems. CMake target builds caught whether the artifact path actually worked.
 - Prefer wall-grown ribs for narrow or one-stud cases. Ribs need to connect to a side wall or curved wall and stop near the stud clearance circle; floating roof ribs mostly provide decorative anxiety.
-- Preserve the original anti-stud ring lattice for large sliced footprints. When a ring hollow intersects the center closure or a cut wall, put the wall back and leave only the stud relief actually needed for clamping. Deleting a tube may look tidy, but it breaks the pattern and quietly steals clutch.
+- Prefer sparse official-style underside clamp patterns for large footprints. DUPLO-style clutch is not a dense socket carpet; it is a selected set of tubes, walls, and ribs that leaves clearance for studs to enter, find the grid, and settle without every tolerance error joining the argument.
+- Preserve an even sparse anti-stud pattern for large sliced footprints. When a ring hollow intersects the center closure or a cut wall, put the wall back and leave only the stud relief actually needed for clamping. Deleting a tube may look tidy, but it breaks the pattern and quietly steals clutch.
+- For subtractive solid mounts, hollow first and add the sparse clamp back. Everything-a-brick-style cutters need a cavity up to clamp height, a preserved outer shell, ring or rib keepers removed from the cavity cutter, then stud relief cuts through the shell where lower studs would collide.
+- Keep the preserved outer shell robust. The Everything-a-brick implementation uses a 3.2 mm minimum shell wall so the remaining skin is not a fragile shard waiting to become a bad afternoon.
+- When no full anti-stud ring fits an organic or tiny footprint, switch to wall-grown fallback ribs connected to the preserved shell. Surface that state in debug output instead of silently producing a hollow brick with no clutch geometry.
 - Keep grooves shallow and consistent. Cake layer grooves and cream-shell paint lines worked once they shared depth, overlapped just enough at corners, stopped at intended boundaries, and avoided cutting through thin side walls.
 
 What did not work:
@@ -19,8 +23,31 @@ What did not work:
 - Partial top studs made bad functional geometry. Removing partial top studs and requiring full containment gave cleaner, more predictable clutch.
 - Partial bottom studs and clamp ribs placed only by "looks nearby" logic were unreliable. Ribs must be targeted against an actual stud clearance circle and anchored to a wall.
 - Removing center-adjacent anti-stud tubes to protect the slice center wall was the wrong abstraction. The right fix is uniform ring placement, footprint clipping, center-wall restoration, and relief cuts only where the lower studs need room.
+- Dense bottom clamp grids overconstrained the fit. A generated underside that tries to grip every possible stud has higher insertion force, worse tolerance stacking, and less of the self-aligning behavior seen in larger official DUPLO bricks.
+- In subtractive solid cutters, cutting fewer clamp tubes into an otherwise solid cut plane did not create sparse clutch. The remaining solid still blocked lower studs; the correct sequence is hollow, preserve shell, add sparse keepers, then cut stud reliefs.
+- Letting `antiStudCenters.length === 0` mean "no underside clutch" failed on small organic cuts such as the strawberry test. Tiny cuts need a sparse wall-rib fallback if full rings cannot fit.
 - A real brick fitting a generated brick did not prove generated-on-generated fit. Printed top studs can be effectively smaller because of rounded profiles, slicer horizontal compensation, shrink, elephant-foot compensation, and material flex.
 - Duplicated metadata was fragile. Catalog data belongs beside the preset it describes; separate side tables invite stale IDs and tiny administrative ruin.
+
+## Sparse Clamp Pattern Rationale
+
+Use sparse clamp geometry whenever the footprint can support it.
+
+Why it is preferred:
+
+- Sparse clamps reduce overconstraint. Dense patterns make many studs and sockets fight at once, so tiny pitch, radius, print-shrink, elephant-foot, and layer-line errors stack into one large insertion-force problem.
+- Sparse clamps leave entry clearance. The lower studs can enter open space first, then contact a few meaningful walls or tubes instead of colliding with a full checkerboard of plastic.
+- Sparse clamps improve self-alignment. A small number of well-placed compliant contact surfaces nudges the brick toward the stud grid; a dense pattern tends to bind before it has a chance to slide into place.
+- Sparse clamps are more forgiving for printed parts. Printed plastic is usually stiffer, rougher, and less dimensionally consistent than molded ABS, so copying the visual density of a grid is not the same as copying the functional behavior.
+
+Implementation rules:
+
+1. Keep nominal pitch, stud, anti-stud, and clearance dimensions recognizable. Tuning belongs in explicit compensation parameters.
+2. Select sparse full-fit anti-stud centers for large rectangular, round, or sliced footprints. Avoid partial edge tubes unless there is a deliberate wall-grown support strategy.
+3. For OpenSCAD shell generators, keep sparse rings/tubes only where the footprint supports them; use wall ribs for boundaries and tiny shapes.
+4. For subtractive solid generators, build the cutter as cavity plus stud reliefs minus keepers. The cavity hollows the cut plane up to clamp height while preserving the outer shell; keepers become sparse rings or wall ribs; stud reliefs cut only where lower studs need to pass.
+5. Preserve a shell thick enough to survive handling. In Everything-a-brick, 3.2 mm is the current minimum shell wall for the preserved outer skin.
+6. If no full ring fits, use a `sparse-wall-ribs` style fallback: ribs grown from the preserved shell toward stud clearance circles, with debug state that says the fallback was used.
 
 ## Cake Generator Pattern
 
@@ -79,7 +106,9 @@ Run a focused loop for every geometry change:
    - full top studs only;
    - ribs attached to walls, not just the roof;
    - anti-studs or ribs aligned with real grid/stud targets;
-   - large slices keep the expected anti-stud ring pattern instead of acquiring a suspicious bald center;
+   - large footprints keep a sparse, even anti-stud pattern instead of acquiring a suspicious bald center or a dense clamp carpet;
+   - subtractive mounts have a hollow cut plane, solid preserved shell, sparse ring/rib keepers, and shell relief cuts where lower studs need clearance;
    - shallow grooves that do not pierce thin walls;
    - no accidental output outside ignored artifact folders.
-6. For physical fit, print a small calibration preset first. Change one of these at a time: `Stud_radius_compensation`, bottom clearance, rib width, or rib reach. Reprinting a whole cake to tune 0.05 mm is how filament learns contempt.
+6. For browser-based cutters such as Everything-a-brick, run the app build/tests and inspect with Playwright before claiming a clutch fix. Check debug state such as `clampPattern`, `antiStuds`, `fallbackClampRibs`, and `minimumShellWall`, then probe the downloaded STL for first solid Z at cavity, shell, relief, and ring/rib sample points.
+7. For physical fit, print a small calibration preset first. Change one of these at a time: `Stud_radius_compensation`, bottom clearance, rib width, or rib reach. Reprinting a whole cake to tune 0.05 mm is how filament learns contempt.
