@@ -7,9 +7,55 @@ const ANTI_STUD_RING_OUTER_RADIUS = 6.43;
 const ANTI_STUD_TOOL_RADIUS = 7.8;
 const MINIMUM_SHELL_WALL = 3.2;
 
+test("walks the first-run guide as a pointed tour and reopens it on demand", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+
+  const guide = page.locator("#guidePanel");
+  const spotlight = page.locator("#guideSpotlight");
+  await expect(guide).toBeVisible();
+  await expect(spotlight).toBeVisible();
+  await expect(guide).toContainText("Step 1 of");
+  await expect(guide).toContainText("Feed the mesh");
+
+  const fileBox = await page.locator("#stlFile").boundingBox();
+  const spotlightBox = await spotlight.boundingBox();
+  expect(fileBox).not.toBeNull();
+  expect(spotlightBox).not.toBeNull();
+  expect(rectsOverlap(fileBox, spotlightBox)).toBe(true);
+
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole("button", { name: "Next" }).click();
+  }
+  await expect(guide).toContainText("Pick a face center");
+  const studStep = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(studStep.operationMode).toBe("studs");
+  expect(studStep.guideStep).toBe(6);
+
+  for (let index = 0; index < 3; index += 1) {
+    await page.getByRole("button", { name: "Next" }).click();
+  }
+  await expect(guide).toContainText("Export the STL");
+  await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(guide).toBeHidden();
+  await expect(spotlight).toBeHidden();
+
+  await page.reload();
+  await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+  await expect(guide).toBeHidden();
+
+  await page.getByRole("button", { name: "Guide" }).click();
+  await expect(guide).toBeVisible();
+  await expect(guide).toContainText("Feed the mesh");
+  const state = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(state.guideVisible).toBe(true);
+});
+
 test("cuts safe d-brick mounts into the demo mesh and explodes the result", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+  await dismissGuide(page);
 
   await expect(page.getByRole("heading", { name: /everything is a brick now/i })).toBeVisible();
   await expect(page.locator("#planeX")).toBeHidden();
@@ -146,6 +192,7 @@ test("cuts safe d-brick mounts into the demo mesh and explodes the result", asyn
 test("uses wall-rib fallback when full anti-stud rings do not fit", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+  await dismissGuide(page);
 
   await page.setInputFiles("#stlFile", {
     name: "tiny-box.stl",
@@ -195,6 +242,7 @@ test("uses wall-rib fallback when full anti-stud rings do not fit", async ({ pag
 test("adds raised stud grids to multiple selected flat planes without cutting the mesh", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+  await dismissGuide(page);
 
   await page.setInputFiles("#stlFile", {
     name: "mount-box.stl",
@@ -314,6 +362,21 @@ async function clickResultPart(page) {
 
   const state = await page.evaluate(() => window.__everythingABrick.getState());
   expect(state.selectedResultIndex).not.toBeNull();
+}
+
+async function dismissGuide(page) {
+  const guide = page.locator("#guidePanel");
+  if (await guide.isVisible()) {
+    await page.getByRole("button", { name: "Close guide" }).click();
+    await expect(guide).toBeHidden();
+  }
+}
+
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y;
 }
 
 async function clickCanvasCenter(page) {
@@ -582,6 +645,7 @@ function zHitsAt(bytes, x, y) {
 test("renders a nonblank preview and can switch between source and result", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+  await dismissGuide(page);
   await page.getByRole("button", { name: "Rotate Plane" }).click();
   await expect(page.getByRole("button", { name: "Rotate Plane" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Move Plane" })).toHaveAttribute("aria-pressed", "false");

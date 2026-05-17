@@ -318,6 +318,125 @@ input {
   background: var(--acid);
 }
 
+.guide-spotlight {
+  position: fixed;
+  z-index: 30;
+  border: 3px solid var(--acid);
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(24, 24, 24, 0.38);
+  pointer-events: none;
+}
+
+.guide-spotlight[hidden] {
+  display: none;
+}
+
+.guide-panel {
+  position: fixed;
+  left: 18px;
+  top: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 12px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 24px));
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 6px 6px 0 var(--line), var(--shadow);
+  overflow: auto;
+  --guide-arrow-offset: 28px;
+}
+
+.guide-panel[hidden] {
+  display: none;
+}
+
+.guide-panel::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line);
+  background: var(--panel);
+  transform: rotate(45deg);
+}
+
+.guide-panel[data-placement="right"]::after {
+  left: -10px;
+  top: var(--guide-arrow-offset);
+  border-top: 0;
+  border-right: 0;
+}
+
+.guide-panel[data-placement="left"]::after {
+  right: -10px;
+  top: var(--guide-arrow-offset);
+  border-bottom: 0;
+  border-left: 0;
+}
+
+.guide-panel[data-placement="bottom"]::after {
+  top: -10px;
+  left: var(--guide-arrow-offset);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.guide-panel[data-placement="top"]::after {
+  bottom: -10px;
+  left: var(--guide-arrow-offset);
+  border-top: 0;
+  border-left: 0;
+}
+
+.guide-header {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.guide-header h2 {
+  margin: 0;
+  font-size: 1.22rem;
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.guide-header button,
+.guide-actions button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--panel-strong);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.guide-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.guide-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.guide-actions button:disabled {
+  color: rgba(24, 24, 24, 0.48);
+  background: #ddd8cc;
+  cursor: not-allowed;
+}
+
 .viewer-shell {
   position: relative;
   width: 100%;
@@ -389,6 +508,11 @@ input {
 
   .toolbar-actions {
     justify-content: flex-start;
+  }
+
+  .guide-panel {
+    right: 10px;
+    bottom: 10px;
   }
 }
 

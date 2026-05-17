@@ -70,6 +70,7 @@
             <button id="sourceButton" type="button" aria-pressed="false">Source</button>
             <button id="resultButton" type="button" aria-pressed="true">Brickified</button>
             <button id="deletePartButton" type="button" disabled>Delete Selected</button>
+            <button id="guideButton" type="button" aria-pressed="false">Guide</button>
             <button id="resetCameraButton" type="button">Reset</button>
           </div>
         </div>
@@ -95,5 +96,22 @@
         </div>
       </section>
     </main>
+
+    <div id="guideSpotlight" class="guide-spotlight" hidden></div>
+    <aside id="guidePanel" class="guide-panel" role="dialog" aria-labelledby="guideTitle" aria-describedby="guideBody" hidden>
+      <div class="guide-header">
+        <div>
+          <p id="guideStepCounter" class="eyebrow">Step 1 of 1</p>
+          <h2 id="guideTitle">How to brick the thing</h2>
+        </div>
+        <button id="guideCloseButton" type="button" aria-label="Close guide">Skip</button>
+      </div>
+      <p id="guideBody" class="guide-body">A small bubble is preparing to point at something. Bold strategy.</p>
+      <div class="guide-actions">
+        <button id="guideBackButton" type="button">Back</button>
+        <button id="guideNextButton" class="primary-button" type="button">Next</button>
+        <button id="guideDoneButton" class="primary-button" type="button" hidden>Done</button>
+      </div>
+    </aside>
   </body>
 </html>

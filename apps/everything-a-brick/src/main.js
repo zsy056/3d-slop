@@ -25,6 +25,77 @@ const D = {
 
 const EPSILON = 0.08;
 const STUD_FIT_CLEARANCE = 0.22;
+const GUIDE_STORAGE_KEY = "everything-a-brick-guide-v1";
+const GUIDE_STEPS = [
+  {
+    selector: "#stlFile",
+    placement: "right",
+    title: "Feed the mesh",
+    body: "Load your own STL here. The demo sphere is nearby for days when file dialogs have already taken enough."
+  },
+  {
+    selector: "#cutModeButton",
+    placement: "right",
+    mode: "cut",
+    title: "Cut Mounts workflow",
+    body: "Cut Mounts uses the green plane to split the mesh and carve underside clutch features into halves with enough depth."
+  },
+  {
+    selector: "#movePlaneButton",
+    fallbackSelector: "#cutModeButton",
+    placement: "bottom",
+    mode: "cut",
+    title: "Place the cut plane",
+    body: "Move Plane and Rotate Plane control where the operation happens. The preview outlines the sparse clutch footprint."
+  },
+  {
+    selector: "#buildButton",
+    placement: "right",
+    mode: "cut",
+    title: "Generate cut mounts",
+    body: "This button runs the cut workflow. Shallow sides are rejected, because optimism is not wall thickness."
+  },
+  {
+    selector: "#sourceButton",
+    placement: "bottom",
+    title: "Inspect the result",
+    body: "Source and Brickified let you compare the original mesh with the generated result before exporting the situation."
+  },
+  {
+    selector: "#studModeButton",
+    placement: "right",
+    title: "Stud Planes workflow",
+    body: "Stud Planes keeps the STL whole and adds hollow, rounded studs to selected flat faces."
+  },
+  {
+    selector: "#brickCanvas",
+    placement: "left",
+    mode: "studs",
+    title: "Pick a face center",
+    body: "In Stud Planes mode, click a flat face to place the stud-grid center. Click that same plane again to move it."
+  },
+  {
+    selector: "#studPlaneControls",
+    fallbackSelector: "#studModeButton",
+    placement: "right",
+    mode: "studs",
+    title: "Manage selected planes",
+    body: "Chosen planes appear here. Select one, delete it, or clear the list before committing the studs to plastic destiny."
+  },
+  {
+    selector: "#buildButton",
+    placement: "right",
+    mode: "studs",
+    title: "Add the studs",
+    body: "In Stud Planes mode, the build button unions rounded tube studs onto the original mesh without cutting it apart."
+  },
+  {
+    selector: "#downloadLink",
+    placement: "right",
+    title: "Export the STL",
+    body: "When a result exists, download the generated STL here. The filename changes with the workflow, because even files deserve a clue."
+  }
+];
 
 const els = {
   canvas: document.querySelector("#brickCanvas"),
@@ -50,6 +121,16 @@ const els = {
   sourceButton: document.querySelector("#sourceButton"),
   resultButton: document.querySelector("#resultButton"),
   deletePartButton: document.querySelector("#deletePartButton"),
+  guideButton: document.querySelector("#guideButton"),
+  guideSpotlight: document.querySelector("#guideSpotlight"),
+  guidePanel: document.querySelector("#guidePanel"),
+  guideStepCounter: document.querySelector("#guideStepCounter"),
+  guideTitle: document.querySelector("#guideTitle"),
+  guideBody: document.querySelector("#guideBody"),
+  guideCloseButton: document.querySelector("#guideCloseButton"),
+  guideBackButton: document.querySelector("#guideBackButton"),
+  guideNextButton: document.querySelector("#guideNextButton"),
+  guideDoneButton: document.querySelector("#guideDoneButton"),
   resetCameraButton: document.querySelector("#resetCameraButton"),
   modelTitle: document.querySelector("#modelTitle"),
   statusText: document.querySelector("#statusText"),
@@ -152,6 +233,7 @@ const state = {
   sourcePickableMeshes: []
 };
 
+let guideStepIndex = 0;
 let readyResolve;
 window.__everythingABrickReady = new Promise((resolve) => {
   readyResolve = resolve;
@@ -166,6 +248,9 @@ window.__everythingABrick = {
   addStudPlane: ({ origin, normal }) => addStudTargetFromPointNormal(origin, normal),
   setStudCenter: ({ index, origin }) => setStudTargetCenter(index, origin),
   clearStudPlanes: () => clearStudTargets(),
+  showGuide: () => showGuide({ step: 0 }),
+  hideGuide: () => hideGuide(),
+  resetGuide: () => resetGuidePreference(),
   setCamera: ({ position, target }) => setDebugCamera(position, target),
   getState: () => ({
     sourceLoaded: Boolean(state.sourceManifold),
@@ -206,6 +291,9 @@ window.__everythingABrick = {
       damping: controls.enableDamping
     },
     viewMode: state.viewMode,
+    guideVisible: !els.guidePanel.hidden,
+    guideStep: guideStepIndex,
+    guideSteps: GUIDE_STEPS.length,
     downloadReady: els.downloadLink.getAttribute("aria-disabled") !== "true"
   })
 };
@@ -227,6 +315,11 @@ function init() {
   els.sourceButton.addEventListener("click", () => setViewMode("source"));
   els.resultButton.addEventListener("click", () => setViewMode("result"));
   els.deletePartButton.addEventListener("click", () => deleteSelectedPart());
+  els.guideButton.addEventListener("click", () => showGuide({ step: 0 }));
+  els.guideCloseButton.addEventListener("click", () => hideGuide());
+  els.guideBackButton.addEventListener("click", () => previousGuideStep());
+  els.guideNextButton.addEventListener("click", () => nextGuideStep());
+  els.guideDoneButton.addEventListener("click", () => hideGuide());
   els.resetCameraButton.addEventListener("click", () => resetWork());
   els.canvas.addEventListener("pointerdown", handleCanvasPointerDown);
   els.canvas.addEventListener("pointermove", handleCanvasPointerMove);
@@ -246,6 +339,9 @@ function init() {
 
   updateModeControls();
   loadDemo();
+  showGuideOnFirstRun();
+  window.addEventListener("resize", positionCurrentGuideStep);
+  window.addEventListener("scroll", positionCurrentGuideStep, true);
   animate();
 }
 
@@ -258,6 +354,201 @@ function loadDemo() {
   setViewMode("source");
   setStatus("Demo sphere loaded. The cut face is large; stud planes await flatter prey.");
   readyResolve?.(window.__everythingABrick.getState());
+}
+
+function showGuideOnFirstRun() {
+  if (!guideWasSeen()) {
+    showGuide({ step: 0 });
+  }
+}
+
+function showGuide({ step = 0 } = {}) {
+  guideStepIndex = clamp(Math.round(step), 0, GUIDE_STEPS.length - 1);
+  els.guidePanel.hidden = false;
+  els.guideSpotlight.hidden = false;
+  els.guideButton.setAttribute("aria-pressed", "true");
+  renderGuideStep();
+}
+
+function hideGuide() {
+  els.guidePanel.hidden = true;
+  els.guideSpotlight.hidden = true;
+  els.guideButton.setAttribute("aria-pressed", "false");
+  rememberGuideSeen();
+}
+
+function nextGuideStep() {
+  if (guideStepIndex >= GUIDE_STEPS.length - 1) {
+    hideGuide();
+    return;
+  }
+
+  guideStepIndex += 1;
+  renderGuideStep();
+}
+
+function previousGuideStep() {
+  guideStepIndex = Math.max(0, guideStepIndex - 1);
+  renderGuideStep();
+}
+
+function renderGuideStep() {
+  const step = GUIDE_STEPS[guideStepIndex];
+  prepareGuideStep(step);
+
+  els.guideStepCounter.textContent = `Step ${guideStepIndex + 1} of ${GUIDE_STEPS.length}`;
+  els.guideTitle.textContent = step.title;
+  els.guideBody.textContent = step.body;
+  els.guideBackButton.disabled = guideStepIndex === 0;
+  els.guideNextButton.hidden = guideStepIndex === GUIDE_STEPS.length - 1;
+  els.guideDoneButton.hidden = guideStepIndex !== GUIDE_STEPS.length - 1;
+
+  const target = guideTargetForStep(step);
+  if (!target) {
+    return;
+  }
+
+  target.scrollIntoView({ block: "center", inline: "nearest" });
+  window.requestAnimationFrame(() => positionGuideForTarget(target, step.placement));
+}
+
+function prepareGuideStep(step) {
+  if (step.mode && state.operationMode !== step.mode && state.resultManifolds.length === 0) {
+    setOperationMode(step.mode);
+  }
+}
+
+function positionCurrentGuideStep() {
+  if (els.guidePanel.hidden) {
+    return;
+  }
+
+  const step = GUIDE_STEPS[guideStepIndex];
+  const target = guideTargetForStep(step);
+  if (target) {
+    positionGuideForTarget(target, step.placement);
+  }
+}
+
+function guideTargetForStep(step) {
+  return visibleElement(step.selector) ??
+    visibleElement(step.fallbackSelector) ??
+    els.canvas;
+}
+
+function visibleElement(selector) {
+  if (!selector) {
+    return null;
+  }
+
+  const element = document.querySelector(selector);
+  if (!element || element.hidden) {
+    return null;
+  }
+
+  const rect = element.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) {
+    return null;
+  }
+
+  return element;
+}
+
+function positionGuideForTarget(target, preferredPlacement = "right") {
+  const targetRect = target.getBoundingClientRect();
+  const panel = els.guidePanel;
+  const margin = 12;
+  const gap = 18;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const panelWidth = panel.offsetWidth;
+  const panelHeight = panel.offsetHeight;
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
+  let placement = preferredPlacement;
+  let left = 0;
+  let top = 0;
+
+  if (placement === "right") {
+    left = targetRect.right + gap;
+    top = targetCenterY - panelHeight / 2;
+    if (left + panelWidth > viewportWidth - margin) {
+      placement = "left";
+    }
+  }
+
+  if (placement === "left") {
+    left = targetRect.left - panelWidth - gap;
+    top = targetCenterY - panelHeight / 2;
+    if (left < margin) {
+      placement = targetRect.bottom + gap + panelHeight < viewportHeight ? "bottom" : "top";
+    }
+  }
+
+  if (placement === "bottom") {
+    left = targetCenterX - panelWidth / 2;
+    top = targetRect.bottom + gap;
+    if (top + panelHeight > viewportHeight - margin) {
+      placement = "top";
+    }
+  }
+
+  if (placement === "top") {
+    left = targetCenterX - panelWidth / 2;
+    top = targetRect.top - panelHeight - gap;
+    if (top < margin) {
+      placement = "bottom";
+      top = targetRect.bottom + gap;
+    }
+  }
+
+  if (placement === "bottom") {
+    left = targetCenterX - panelWidth / 2;
+    top = targetRect.bottom + gap;
+  }
+
+  left = clamp(left, margin, viewportWidth - panelWidth - margin);
+  top = clamp(top, margin, viewportHeight - panelHeight - margin);
+  panel.style.left = `${left}px`;
+  panel.style.top = `${top}px`;
+  panel.dataset.placement = placement;
+
+  if (placement === "left" || placement === "right") {
+    panel.style.setProperty("--guide-arrow-offset", `${clamp(targetCenterY - top - 8, 20, panelHeight - 28)}px`);
+  } else {
+    panel.style.setProperty("--guide-arrow-offset", `${clamp(targetCenterX - left - 8, 20, panelWidth - 28)}px`);
+  }
+
+  const pad = 7;
+  els.guideSpotlight.style.left = `${Math.max(margin, targetRect.left - pad)}px`;
+  els.guideSpotlight.style.top = `${Math.max(margin, targetRect.top - pad)}px`;
+  els.guideSpotlight.style.width = `${Math.min(viewportWidth - margin * 2, targetRect.width + pad * 2)}px`;
+  els.guideSpotlight.style.height = `${Math.min(viewportHeight - margin * 2, targetRect.height + pad * 2)}px`;
+}
+
+function guideWasSeen() {
+  try {
+    return window.localStorage.getItem(GUIDE_STORAGE_KEY) === "seen";
+  } catch {
+    return false;
+  }
+}
+
+function rememberGuideSeen() {
+  try {
+    window.localStorage.setItem(GUIDE_STORAGE_KEY, "seen");
+  } catch {
+    // The guide still works without storage. Browsers do enjoy withholding tiny favors.
+  }
+}
+
+function resetGuidePreference() {
+  try {
+    window.localStorage.removeItem(GUIDE_STORAGE_KEY);
+  } catch {
+    // Nothing to reset if storage is unavailable.
+  }
+  showGuide({ step: 0 });
 }
 
 async function handleFileInput(event) {
