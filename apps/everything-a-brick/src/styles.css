@@ -151,6 +151,79 @@ input {
   text-transform: none;
 }
 
+.mode-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mode-control button,
+.target-list button {
+  min-height: 42px;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--panel-strong);
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mode-control button[aria-pressed="true"],
+.target-list button[aria-pressed="true"] {
+  background: var(--acid);
+}
+
+.stud-plane-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.target-list {
+  display: grid;
+  gap: 8px;
+}
+
+.target-list:empty::before {
+  content: "No stud planes picked.";
+  display: block;
+  padding: 10px 12px;
+  border: 2px dashed rgba(37, 37, 37, 0.48);
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.target-list button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.target-list span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.target-list .target-name {
+  font-size: 0.92rem;
+}
+
+.target-list .target-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.target-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .range-control span {
   display: flex;
   justify-content: space-between;

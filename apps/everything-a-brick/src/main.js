@@ -9,6 +9,8 @@ const D = {
   unit: 15.88,
   studRadius: 4.67,
   studHeight: 4.6,
+  studWallThickness: 1.3,
+  studRadiusCompensation: 0.15,
   studHeightClearance: 0.15,
   antiStudOuterRadius: 6.55,
   antiStudWall: 1,
@@ -22,11 +24,18 @@ const D = {
 };
 
 const EPSILON = 0.08;
+const STUD_FIT_CLEARANCE = 0.22;
 
 const els = {
   canvas: document.querySelector("#brickCanvas"),
   stlFile: document.querySelector("#stlFile"),
   demoButton: document.querySelector("#demoButton"),
+  cutModeButton: document.querySelector("#cutModeButton"),
+  studModeButton: document.querySelector("#studModeButton"),
+  studPlaneControls: document.querySelector("#studPlaneControls"),
+  studPlaneList: document.querySelector("#studPlaneList"),
+  deleteStudPlaneButton: document.querySelector("#deleteStudPlaneButton"),
+  clearStudPlanesButton: document.querySelector("#clearStudPlanesButton"),
   buildButton: document.querySelector("#buildButton"),
   downloadLink: document.querySelector("#downloadLink"),
   planeX: document.querySelector("#planeX"),
@@ -85,9 +94,11 @@ let pointerDown = null;
 const modelRoot = new THREE.Group();
 const planeHandle = new THREE.Group();
 const planeVisuals = new THREE.Group();
+const studPlaneVisuals = new THREE.Group();
 planeHandle.add(planeVisuals);
 scene.add(modelRoot);
 scene.add(planeHandle);
+scene.add(studPlaneVisuals);
 
 const transformControls = new TransformControls(camera, renderer.domElement);
 transformControls.attach(planeHandle);
@@ -128,12 +139,17 @@ const state = {
   resultBounds: null,
   resultPartBounds: [],
   splitInfo: null,
+  studInfo: null,
+  operationMode: "cut",
+  studTargets: [],
+  selectedStudTargetIndex: null,
   planePreview: null,
   viewMode: "source",
   downloadUrl: null,
   currentGeometry: null,
   currentBox: null,
-  pickableMeshes: []
+  pickableMeshes: [],
+  sourcePickableMeshes: []
 };
 
 let readyResolve;
@@ -146,10 +162,15 @@ window.__everythingABrick = {
   loadDemo: () => loadDemo(),
   reset: () => resetWork(),
   deleteSelectedPart: () => deleteSelectedPart(),
+  setMode: (mode) => setOperationMode(mode),
+  addStudPlane: ({ origin, normal }) => addStudTargetFromPointNormal(origin, normal),
+  setStudCenter: ({ index, origin }) => setStudTargetCenter(index, origin),
+  clearStudPlanes: () => clearStudTargets(),
   setCamera: ({ position, target }) => setDebugCamera(position, target),
   getState: () => ({
     sourceLoaded: Boolean(state.sourceManifold),
     resultLoaded: state.resultManifolds.length > 0,
+    operationMode: state.operationMode,
     sourceTriangles: state.sourceTriangles,
     resultTriangles: state.resultTriangles,
     sourceBounds: cloneBounds(state.sourceBounds),
@@ -158,8 +179,16 @@ window.__everythingABrick = {
     resultPartNames: [...state.resultPartNames],
     selectedResultIndex: state.selectedResultIndex,
     splitInfo: state.splitInfo,
+    studInfo: state.studInfo,
+    studTargets: state.studTargets.map(serializeStudTarget),
+    selectedStudTargetIndex: state.selectedStudTargetIndex,
     planePreview: state.planePreview,
     dimensions: {
+      studRadius: D.studRadius,
+      topStudRadius: topStudRadius(),
+      topStudInnerRadius: topStudInnerRadius(),
+      topStudEdgeRadius: topStudEdgeRadius(),
+      studWallThickness: D.studWallThickness,
       studHeight: D.studHeight,
       studHeightClearance: D.studHeightClearance,
       studFeatureDepth: studFeatureDepth(),
@@ -188,6 +217,10 @@ function init() {
   window.addEventListener("resize", resizeRenderer);
   els.demoButton.addEventListener("click", () => loadDemo());
   els.stlFile.addEventListener("change", handleFileInput);
+  els.cutModeButton.addEventListener("click", () => setOperationMode("cut"));
+  els.studModeButton.addEventListener("click", () => setOperationMode("studs"));
+  els.deleteStudPlaneButton.addEventListener("click", () => deleteSelectedStudTarget());
+  els.clearStudPlanesButton.addEventListener("click", () => clearStudTargets());
   els.buildButton.addEventListener("click", () => buildBrick());
   els.movePlaneButton.addEventListener("click", () => setPlaneMode("translate"));
   els.rotatePlaneButton.addEventListener("click", () => setPlaneMode("rotate"));
@@ -211,6 +244,7 @@ function init() {
     input.addEventListener("change", updateControlsAndPlane);
   }
 
+  updateModeControls();
   loadDemo();
   animate();
 }
@@ -222,7 +256,7 @@ function loadDemo() {
   els.planeZ.value = sphereRadius.toFixed(1);
   updateControlsAndPlane();
   setViewMode("source");
-  setStatus("Demo sphere loaded. The cut face is now large, round, and harder to blame.");
+  setStatus("Demo sphere loaded. The cut face is large; stud planes await flatter prey.");
   readyResolve?.(window.__everythingABrick.getState());
 }
 
@@ -248,6 +282,7 @@ async function handleFileInput(event) {
 
 function setSourceManifold(manifold, name) {
   clearResult();
+  clearStudTargets({ silent: true });
   const normalized = normalizeManifold(manifold);
   state.sourceName = name;
   state.sourceManifold = normalized.manifold;
@@ -297,7 +332,120 @@ function recommendedPlaneOffset(spanZ) {
   return Math.min(studFeatureDepth() * 1.3, Math.max(0, spanZ - studFeatureDepth()));
 }
 
+function setOperationMode(mode) {
+  const nextMode = mode === "studs" || mode === "stud-planes" ? "studs" : "cut";
+  if (state.operationMode === nextMode) {
+    return;
+  }
+
+  clearResult();
+  state.operationMode = nextMode;
+  state.viewMode = "source";
+  updateModeControls();
+  setViewMode("source");
+  updatePlaneHelper();
+  setStatus(nextMode === "studs" ?
+    "Stud plane mode. Click a flat face to place the grid center; click that plane again to move it." :
+    "Cut mount mode. One plane, two possible halves, familiar little crisis.");
+}
+
+function updateModeControls() {
+  els.cutModeButton.setAttribute("aria-pressed", String(state.operationMode === "cut"));
+  els.studModeButton.setAttribute("aria-pressed", String(state.operationMode === "studs"));
+  els.studPlaneControls.hidden = state.operationMode !== "studs";
+  els.buildButton.textContent = state.operationMode === "studs" ? "Add Stud Pattern" : "Cut D-Brick Mounts";
+  setPlaneToolVisible(state.viewMode === "source" && state.resultManifolds.length === 0);
+  updateStudPlaneList();
+}
+
+function clearStudTargets({ silent = false } = {}) {
+  const shouldReturnToSource = !silent && state.sourceManifold && state.viewMode === "result";
+  state.studTargets = [];
+  state.selectedStudTargetIndex = null;
+  clearResult();
+  updateStudPlaneList();
+  if (shouldReturnToSource) {
+    setViewMode("source");
+  } else {
+    updatePlaneHelper();
+  }
+  if (!silent && state.operationMode === "studs") {
+    setStatus("Stud planes cleared. The mesh has been briefly spared.");
+  }
+}
+
+function selectStudTarget(index) {
+  if (index < 0 || index >= state.studTargets.length) {
+    state.selectedStudTargetIndex = null;
+  } else {
+    state.selectedStudTargetIndex = index;
+  }
+
+  updateStudPlaneList();
+  updatePlaneHelper();
+}
+
+function deleteSelectedStudTarget() {
+  if (state.selectedStudTargetIndex === null) {
+    return;
+  }
+
+  const removed = state.selectedStudTargetIndex + 1;
+  state.studTargets.splice(state.selectedStudTargetIndex, 1);
+  state.selectedStudTargetIndex = state.studTargets.length ?
+    Math.min(state.selectedStudTargetIndex, state.studTargets.length - 1) :
+    null;
+  clearResult();
+  updateStudPlaneList();
+  if (state.sourceManifold && state.viewMode === "result") {
+    setViewMode("source");
+  } else {
+    updatePlaneHelper();
+  }
+  setStatus(`Deleted stud plane ${removed}. Its tiny ambition has been archived.`);
+}
+
+function updateStudPlaneList() {
+  els.studPlaneList.textContent = "";
+
+  state.studTargets.forEach((target, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(index === state.selectedStudTargetIndex));
+    button.innerHTML = `
+      <span class="target-name"></span>
+      <span class="target-meta"></span>
+    `;
+    button.querySelector(".target-name").textContent = `Plane ${index + 1}`;
+    button.querySelector(".target-meta").textContent = studTargetListText(target);
+    button.addEventListener("click", () => selectStudTarget(index));
+    els.studPlaneList.append(button);
+  });
+
+  els.deleteStudPlaneButton.disabled = state.selectedStudTargetIndex === null;
+  els.clearStudPlanesButton.disabled = state.studTargets.length === 0;
+}
+
+function studTargetListText(target) {
+  const preview = target.preview;
+  if (!preview) {
+    return "Awaiting geometry.";
+  }
+
+  const point = target.origin.map((value) => formatMm(value)).join(", ");
+  return `${preview.studCenters.length} studs centered at ${point} mm`;
+}
+
 function buildBrick() {
+  if (state.operationMode === "studs") {
+    buildStudPlanes();
+    return;
+  }
+
+  buildCutMounts();
+}
+
+function buildCutMounts() {
   if (!state.sourceManifold) {
     setStatus("No source mesh. Even this app has standards.");
     return;
@@ -366,10 +514,97 @@ function buildBrick() {
   }
 }
 
+function buildStudPlanes() {
+  if (!state.sourceManifold) {
+    setStatus("No source mesh. Even this app has standards.");
+    return;
+  }
+
+  if (!state.studTargets.length) {
+    setStatus("Pick at least one flat stud plane first. The mesh cannot read intent, mercifully.");
+    return;
+  }
+
+  setStatus("Adding raised studs to selected planes. No cut line, no dramatic separation.");
+
+  try {
+    const patternParts = [];
+    const targetStats = [];
+
+    state.studTargets.forEach((target, index) => {
+      const pattern = makeStudPatternForTarget(target);
+      if (!pattern) {
+        targetStats.push({
+          index,
+          skipped: true,
+          reason: "No studs fit on the selected face.",
+          origin: [...target.origin],
+          normal: [...target.normal],
+          studCenters: []
+        });
+        return;
+      }
+
+      patternParts.push(pattern.manifold);
+      targetStats.push({
+        index,
+        skipped: false,
+        origin: [...target.origin],
+        normal: [...target.normal],
+        u: [...target.u],
+        v: [...target.v],
+        bounds: cloneBounds2(pattern.stats.bounds),
+        studCenters: pattern.stats.studCenters.map((center) => [...center]),
+        studs: pattern.stats.studCenters.length
+      });
+    });
+
+    if (!patternParts.length) {
+      clearResult();
+      state.studInfo = {
+        targets: targetStats,
+        totalStuds: 0
+      };
+      updateStats();
+      setStatus("No selected plane could fit a stud. This is technically a result, but emotionally not.");
+      return;
+    }
+
+    const result = combine([state.sourceManifold, ...patternParts]);
+    state.resultManifolds = [result];
+    state.resultPartNames = ["studded"];
+    state.selectedResultIndex = null;
+    state.resultManifold = result;
+    state.resultTriangles = result.numTri();
+    state.resultBounds = result.boundingBox();
+    state.resultPartBounds = [state.resultBounds];
+    state.splitInfo = null;
+    state.studInfo = {
+      targets: targetStats,
+      totalStuds: targetStats.reduce((sum, target) => sum + (target.studs ?? 0), 0)
+    };
+    state.viewMode = "result";
+    setDownload([result]);
+    updateStats();
+    updateResultPartControls();
+    setViewMode("result");
+    setPlaneToolVisible(false);
+    setStatus(studResultMessage());
+  } catch (error) {
+    setStatus(`Geometry kernel objected to the studs: ${error.message ?? error}`);
+  }
+}
+
 function resultMessage(kept, discarded) {
   const keptText = kept.length === 2 ? "both halves" : `${kept[0]} half`;
   const discardText = discarded.length ? ` Discarded ${discarded.join(" and ")} for being too shallow.` : "";
   return `Generated cut-only mounts on ${keptText}; exploded on the cutting plane for inspection; ${state.resultTriangles.toLocaleString()} triangles survived.${discardText}`;
+}
+
+function studResultMessage() {
+  const count = state.studInfo?.totalStuds ?? 0;
+  const planeCount = state.studInfo?.targets.filter((target) => !target.skipped).length ?? 0;
+  return `Generated ${count} raised studs across ${planeCount} selected plane${planeCount === 1 ? "" : "s"}; source stayed whole; ${state.resultTriangles.toLocaleString()} triangles now explain themselves.`;
 }
 
 function resetWork() {
@@ -380,7 +615,10 @@ function resetWork() {
   clearResult();
   setViewMode("source");
   setPlaneToolVisible(true);
-  setStatus("Reset to the source mesh. The previous cut has been escorted out.");
+  updatePlaneHelper();
+  setStatus(state.operationMode === "studs" ?
+    "Reset to the source mesh. Stud plane picks are still standing there, trying to look useful." :
+    "Reset to the source mesh. The previous cut has been escorted out.");
 }
 
 function selectResultPart(index) {
@@ -475,6 +713,11 @@ function handleCanvasPointerUp(event) {
     return;
   }
 
+  if (state.operationMode === "studs" && state.viewMode === "source") {
+    pickStudPlane(event);
+    return;
+  }
+
   pickResultPart(event);
 }
 
@@ -500,6 +743,154 @@ function pickResultPart(event) {
   selectResultPart(index);
   const name = state.resultPartNames[index] ?? `part ${index + 1}`;
   setStatus(`Selected ${name}. Delete it if this particular chunk is embarrassing.`);
+}
+
+function pickStudPlane(event) {
+  if (!state.sourceManifold || !state.sourcePickableMeshes.length) {
+    return;
+  }
+
+  const rect = els.canvas.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+  raycaster.setFromCamera(pointer, camera);
+
+  const hit = raycaster.intersectObjects(state.sourcePickableMeshes, false)[0];
+  if (!hit?.face) {
+    setStatus("No face selected. The click landed in philosophical space.");
+    return;
+  }
+
+  addStudTargetFromIntersection(hit);
+}
+
+function addStudTargetFromIntersection(hit) {
+  const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+  const origin = hit.point.clone();
+  return addStudTarget(origin, normal);
+}
+
+function addStudTargetFromPointNormal(origin, normal) {
+  if (!Array.isArray(origin) || !Array.isArray(normal) || origin.length !== 3 || normal.length !== 3) {
+    return false;
+  }
+
+  return addStudTarget(
+    new THREE.Vector3(origin[0], origin[1], origin[2]),
+    new THREE.Vector3(normal[0], normal[1], normal[2])
+  );
+}
+
+function setStudTargetCenter(index, origin) {
+  if (!Array.isArray(origin) || origin.length !== 3) {
+    return false;
+  }
+
+  return moveStudTargetCenter(index, new THREE.Vector3(origin[0], origin[1], origin[2]));
+}
+
+function addStudTarget(origin, normal) {
+  if (!state.sourceManifold) {
+    return false;
+  }
+
+  const target = createStudTarget(origin, normal);
+  const existingIndex = matchingStudTargetIndex(target);
+  if (existingIndex !== -1) {
+    return moveStudTargetCenter(existingIndex, origin);
+  }
+
+  const preview = studTargetPreview(target);
+  if (!preview || !preview.studCenters.length) {
+    setStatus("That flat patch cannot fit a stud pattern. It has chosen minimalism.");
+    updateStudPlaneList();
+    updatePlaneHelper();
+    return false;
+  }
+
+  clearResult();
+  target.preview = preview;
+  state.studTargets.push(target);
+  state.selectedStudTargetIndex = state.studTargets.length - 1;
+  updateStudPlaneList();
+  updatePlaneHelper();
+  setStatus(`Added stud plane ${state.studTargets.length} with ${preview.studCenters.length} studs centered on the selected point.`);
+  return true;
+}
+
+function moveStudTargetCenter(index, origin) {
+  if (!Number.isInteger(index) || index < 0 || index >= state.studTargets.length) {
+    return false;
+  }
+
+  const target = state.studTargets[index];
+  const candidate = {
+    ...target,
+    origin: [origin.x, origin.y, origin.z],
+    preview: null
+  };
+  const preview = studTargetPreview(candidate);
+  if (!preview || !preview.studCenters.length) {
+    setStatus("That center leaves no room for studs. The old center is keeping its desk.");
+    return false;
+  }
+
+  clearResult();
+  candidate.preview = preview;
+  state.studTargets[index] = candidate;
+  state.selectedStudTargetIndex = index;
+  updateStudPlaneList();
+  updatePlaneHelper();
+  setStatus(`Moved stud center for plane ${index + 1}; ${preview.studCenters.length} studs still fit.`);
+  return true;
+}
+
+function matchingStudTargetIndex(target) {
+  const normal = new THREE.Vector3(...target.normal);
+  const origin = new THREE.Vector3(...target.origin);
+  const planeOffset = normal.dot(origin);
+
+  return state.studTargets.findIndex((existing) => {
+    const existingNormal = new THREE.Vector3(...existing.normal);
+    const existingOrigin = new THREE.Vector3(...existing.origin);
+    return normal.dot(existingNormal) > 0.995 &&
+      Math.abs(planeOffset - existingNormal.dot(existingOrigin)) < 0.35;
+  });
+}
+
+function createStudTarget(origin, normal) {
+  const outward = outwardNormal(origin, normal);
+  const { u, v } = basisFromNormal(outward);
+  return {
+    origin: [origin.x, origin.y, origin.z],
+    normal: [outward.x, outward.y, outward.z],
+    u: [u.x, u.y, u.z],
+    v: [v.x, v.y, v.z],
+    preview: null
+  };
+}
+
+function outwardNormal(origin, normal) {
+  const sourceCenter = boundsCenter3(state.sourceBounds);
+  const outward = normal.clone().normalize();
+  if (sourceCenter && outward.dot(origin.clone().sub(sourceCenter)) < 0) {
+    outward.multiplyScalar(-1);
+  }
+  return outward;
+}
+
+function basisFromNormal(normal) {
+  const w = normal.clone().normalize();
+  const preferred = Math.abs(w.z) > 0.84 ?
+    new THREE.Vector3(1, 0, 0) :
+    new THREE.Vector3(0, 0, 1);
+  let u = preferred.sub(w.clone().multiplyScalar(preferred.dot(w)));
+  if (u.lengthSq() < 1e-8) {
+    u = new THREE.Vector3(0, 1, 0).sub(w.clone().multiplyScalar(w.y));
+  }
+  u.normalize();
+  const v = new THREE.Vector3().crossVectors(w, u).normalize();
+  return { u, v };
 }
 
 function explodeParts(parts, options) {
@@ -536,6 +927,127 @@ function carveMountFeatures(part, frame, options) {
   return {
     localManifold: cutter ? localPart.subtract(cutter) : localPart,
     features
+  };
+}
+
+function makeStudPatternForTarget(target) {
+  const preview = studTargetPreview(target);
+  target.preview = preview;
+  if (!preview?.studCenters.length) {
+    return null;
+  }
+
+  const localStuds = combine(preview.studCenters.map((center) => topStud(center)));
+  return {
+    manifold: transformToFrame(localStuds, frameFromStudTarget(target)),
+    stats: preview
+  };
+}
+
+function studTargetPreview(target) {
+  if (!state.sourceManifold) {
+    return null;
+  }
+
+  const frame = frameFromStudTarget(target);
+  const localSource = transformFromFrame(state.sourceManifold, frame);
+  const face = studPatternFace(localSource);
+  if (!face) {
+    return null;
+  }
+
+  const studCenters = gridCentersForBounds(
+    face.bounds,
+    0,
+    0,
+    topStudRadius() + STUD_FIT_CLEARANCE
+  ).filter((center) => circleFitsMountFace(center, topStudRadius() + STUD_FIT_CLEARANCE, face));
+
+  return {
+    bounds: face.bounds,
+    studCenters,
+    center: [0, 0],
+    patternDepth: D.studHeight,
+    faceArea: face.section?.area() ?? null
+  };
+}
+
+function studPatternFace(localSource) {
+  for (const depth of [-EPSILON, -EPSILON * 4, -EPSILON * 8, EPSILON]) {
+    const section = localSource.slice(depth);
+    if (!section.isEmpty()) {
+      const bounds = section.bounds();
+      return {
+        bounds: {
+          min: [bounds.min[0], bounds.min[1]],
+          max: [bounds.max[0], bounds.max[1]]
+        },
+        section
+      };
+    }
+  }
+
+  return null;
+}
+
+function topStud(center) {
+  return CrossSection.ofPolygons([roundedTopStudProfile()])
+    .revolve(72)
+    .translate([center[0], center[1], -EPSILON]);
+}
+
+function topStudRadius() {
+  return Math.max(D.studWallThickness + 0.2, D.studRadius + D.studRadiusCompensation);
+}
+
+function topStudInnerRadius() {
+  return Math.max(0.35, topStudRadius() - D.studWallThickness);
+}
+
+function topStudEdgeRadius() {
+  const wall = topStudRadius() - topStudInnerRadius();
+  return Math.min(0.55, wall * 0.32, D.studHeight * 0.28);
+}
+
+function roundedTopStudProfile() {
+  const outerRadius = topStudRadius();
+  const innerRadius = topStudInnerRadius();
+  const edgeRadius = topStudEdgeRadius();
+  const height = D.studHeight + EPSILON;
+  const arcSteps = 8;
+  const points = [
+    [innerRadius, 0],
+    [outerRadius, 0],
+    [outerRadius, height - edgeRadius]
+  ];
+
+  for (let step = 1; step <= arcSteps; step += 1) {
+    const angle = (Math.PI / 2) * (step / arcSteps);
+    points.push([
+      outerRadius - edgeRadius + Math.cos(angle) * edgeRadius,
+      height - edgeRadius + Math.sin(angle) * edgeRadius
+    ]);
+  }
+
+  points.push([innerRadius + edgeRadius, height]);
+
+  for (let step = 1; step <= arcSteps; step += 1) {
+    const angle = Math.PI / 2 + (Math.PI / 2) * (step / arcSteps);
+    points.push([
+      innerRadius + edgeRadius + Math.cos(angle) * edgeRadius,
+      height - edgeRadius + Math.sin(angle) * edgeRadius
+    ]);
+  }
+
+  return points;
+}
+
+function frameFromStudTarget(target) {
+  return {
+    origin: new THREE.Vector3(...target.origin),
+    u: new THREE.Vector3(...target.u).normalize(),
+    v: new THREE.Vector3(...target.v).normalize(),
+    w: new THREE.Vector3(...target.normal).normalize()
   };
 }
 
@@ -833,6 +1345,18 @@ function boundsCenter(bounds) {
   ];
 }
 
+function boundsCenter3(bounds) {
+  if (!bounds) {
+    return null;
+  }
+
+  return new THREE.Vector3(
+    (bounds.min[0] + bounds.max[0]) / 2,
+    (bounds.min[1] + bounds.max[1]) / 2,
+    (bounds.min[2] + bounds.max[2]) / 2
+  );
+}
+
 function pointInsideBounds([x, y], bounds) {
   return x >= bounds.min[0] &&
     x <= bounds.max[0] &&
@@ -1117,22 +1641,26 @@ function setViewMode(mode) {
   } else {
     renderManifolds([state.sourceManifold], 0x247c8a);
   }
+
+  updateModeControls();
 }
 
 function setPlaneToolVisible(visible) {
-  planeHandle.visible = visible;
-  transformHelper.visible = visible;
-  transformControls.enabled = visible;
-  if (!visible) {
+  const showCutPlane = visible && state.operationMode === "cut";
+  planeHandle.visible = showCutPlane;
+  transformHelper.visible = showCutPlane;
+  transformControls.enabled = showCutPlane;
+  if (!showCutPlane) {
     controls.enabled = true;
   }
-  els.movePlaneButton.hidden = !visible;
-  els.rotatePlaneButton.hidden = !visible;
+  els.movePlaneButton.hidden = !showCutPlane;
+  els.rotatePlaneButton.hidden = !showCutPlane;
 }
 
 function renderManifolds(manifolds, color, { frame = true } = {}) {
   modelRoot.clear();
   state.pickableMeshes = [];
+  state.sourcePickableMeshes = [];
   const visible = manifolds.filter(Boolean);
 
   if (!visible.length) {
@@ -1159,6 +1687,9 @@ function renderManifolds(manifolds, color, { frame = true } = {}) {
     if (state.viewMode === "result") {
       mesh.userData.resultIndex = index;
       state.pickableMeshes.push(mesh);
+    } else {
+      mesh.userData.sourceIndex = index;
+      state.sourcePickableMeshes.push(mesh);
     }
     modelRoot.add(mesh);
 
@@ -1178,9 +1709,15 @@ function renderManifolds(manifolds, color, { frame = true } = {}) {
 
 function updatePlaneHelper() {
   planeVisuals.clear();
+  studPlaneVisuals.clear();
   state.planePreview = null;
 
   if (!state.sourceManifold) {
+    return;
+  }
+
+  if (state.operationMode === "studs") {
+    updateStudPlaneHelper();
     return;
   }
 
@@ -1262,6 +1799,95 @@ function sourceCutPlaneBounds(options) {
   return null;
 }
 
+function updateStudPlaneHelper() {
+  if (state.viewMode !== "source") {
+    return;
+  }
+
+  state.studTargets.forEach((target, index) => {
+    const preview = studTargetPreview(target);
+    target.preview = preview;
+    if (!preview) {
+      return;
+    }
+
+    const selected = index === state.selectedStudTargetIndex;
+    const frame = frameFromStudTarget(target);
+    const group = localFrameGroup(frame);
+    const color = selected ? 0xb7ff3c : 0xdc4d7a;
+    const bounds = preview.bounds;
+    const width = Math.max(D.unit, bounds.max[0] - bounds.min[0]);
+    const depth = Math.max(D.unit, bounds.max[1] - bounds.min[1]);
+    const center = boundsCenter(bounds);
+    const patternCenter = [0, 0];
+
+    addLocalRectangle(group, center, width, depth, color, selected ? 0.88 : 0.62);
+    addLocalLine(group, [
+      new THREE.Vector3(patternCenter[0] - D.unit * 0.38, patternCenter[1], D.studHeight + 0.38),
+      new THREE.Vector3(patternCenter[0] + D.unit * 0.38, patternCenter[1], D.studHeight + 0.38)
+    ], color, 0.78);
+    addLocalLine(group, [
+      new THREE.Vector3(patternCenter[0], patternCenter[1] - D.unit * 0.38, D.studHeight + 0.42),
+      new THREE.Vector3(patternCenter[0], patternCenter[1] + D.unit * 0.38, D.studHeight + 0.42)
+    ], color, 0.78);
+
+    for (const studCenter of preview.studCenters) {
+      addLocalCircle(group, studCenter, topStudRadius(), color, selected ? 0.82 : 0.56, D.studHeight + 0.32);
+      addLocalCircle(group, studCenter, topStudInnerRadius(), color, selected ? 0.48 : 0.34, D.studHeight + 0.34);
+    }
+
+    studPlaneVisuals.add(group);
+  });
+}
+
+function localFrameGroup(frame) {
+  const group = new THREE.Group();
+  group.matrixAutoUpdate = false;
+  group.matrix.makeBasis(frame.u, frame.v, frame.w);
+  group.matrix.setPosition(frame.origin);
+  return group;
+}
+
+function addLocalRectangle(group, center, width, depth, color, opacity) {
+  const halfWidth = width / 2;
+  const halfDepth = depth / 2;
+  const points = [
+    new THREE.Vector3(center[0] - halfWidth, center[1] - halfDepth, 0.18),
+    new THREE.Vector3(center[0] + halfWidth, center[1] - halfDepth, 0.18),
+    new THREE.Vector3(center[0] + halfWidth, center[1] + halfDepth, 0.18),
+    new THREE.Vector3(center[0] - halfWidth, center[1] + halfDepth, 0.18)
+  ];
+  group.add(new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(points),
+    planeLineMaterial(color, opacity)
+  ));
+}
+
+function addLocalLine(group, points, color, opacity) {
+  group.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(points),
+    planeLineMaterial(color, opacity)
+  ));
+}
+
+function addLocalCircle(group, center, radius, color, opacity, z = 0.28) {
+  const points = [];
+  const segments = 64;
+  for (let index = 0; index < segments; index += 1) {
+    const angle = (Math.PI * 2 * index) / segments;
+    points.push(new THREE.Vector3(
+      center[0] + Math.cos(angle) * radius,
+      center[1] + Math.sin(angle) * radius,
+      z
+    ));
+  }
+
+  group.add(new THREE.LineLoop(
+    new THREE.BufferGeometry().setFromPoints(points),
+    planeLineMaterial(color, opacity)
+  ));
+}
+
 function addPlaneRectangle(center, width, depth, color, opacity) {
   const halfWidth = width / 2;
   const halfDepth = depth / 2;
@@ -1321,7 +1947,8 @@ function setDownload(manifolds) {
   const blob = geometriesToBinaryStl(geometryList);
   state.downloadUrl = URL.createObjectURL(blob);
   els.downloadLink.href = state.downloadUrl;
-  els.downloadLink.download = `${slugify(state.sourceName)}-d-brickified.stl`;
+  const suffix = state.operationMode === "studs" ? "studded" : "d-brickified";
+  els.downloadLink.download = `${slugify(state.sourceName)}-${suffix}.stl`;
   els.downloadLink.classList.remove("is-disabled");
   els.downloadLink.setAttribute("aria-disabled", "false");
 }
@@ -1335,6 +1962,7 @@ function clearResult() {
   state.resultBounds = null;
   state.resultPartBounds = [];
   state.splitInfo = null;
+  state.studInfo = null;
   if (state.downloadUrl) {
     URL.revokeObjectURL(state.downloadUrl);
     state.downloadUrl = null;
@@ -1400,7 +2028,18 @@ function planeState() {
 }
 
 function updateStats() {
-  if (state.planePreview) {
+  if (state.operationMode === "studs") {
+    const selected = state.selectedStudTargetIndex === null ? null : state.studTargets[state.selectedStudTargetIndex];
+    const preview = selected?.preview;
+    const studCount = state.studTargets.reduce((sum, target) => sum + (target.preview?.studCenters.length ?? 0), 0);
+    if (preview) {
+      const width = preview.bounds.max[0] - preview.bounds.min[0];
+      const depth = preview.bounds.max[1] - preview.bounds.min[1];
+      els.footprintStat.textContent = `${state.studTargets.length} planes, ${studCount} studs; selected ${formatMm(width)} x ${formatMm(depth)} mm`;
+    } else {
+      els.footprintStat.textContent = `${state.studTargets.length} planes, ${studCount} studs`;
+    }
+  } else if (state.planePreview) {
     const width = state.planePreview.bounds.max[0] - state.planePreview.bounds.min[0];
     const depth = state.planePreview.bounds.max[1] - state.planePreview.bounds.min[1];
     els.footprintStat.textContent = `Sparse grid, ${formatMm(width)} x ${formatMm(depth)} mm; ${formatMm(studFeatureDepth())} mm deep`;
@@ -1408,10 +2047,15 @@ function updateStats() {
     els.footprintStat.textContent = `Sparse grid; ${formatMm(studFeatureDepth())} mm deep`;
   }
   els.sourceStat.textContent = state.sourceManifold ? `${state.sourceTriangles.toLocaleString()} triangles` : "-";
-  els.resultStat.textContent = state.resultManifold ? resultStatText() : "Not yet cut.";
+  els.resultStat.textContent = state.resultManifold ? resultStatText() :
+    (state.operationMode === "studs" ? "Not yet studded." : "Not yet cut.");
 }
 
 function resultStatText() {
+  if (state.studInfo) {
+    return `${state.resultTriangles.toLocaleString()} triangles; ${state.studInfo.totalStuds} raised studs`;
+  }
+
   const split = state.splitInfo;
   if (!split) {
     return `${state.resultTriangles.toLocaleString()} triangles`;
@@ -1583,6 +2227,31 @@ function cloneBounds(bounds) {
   return {
     min: [...bounds.min],
     max: [...bounds.max]
+  };
+}
+
+function cloneBounds2(bounds) {
+  if (!bounds) {
+    return null;
+  }
+  return {
+    min: [...bounds.min],
+    max: [...bounds.max]
+  };
+}
+
+function serializeStudTarget(target) {
+  return {
+    origin: [...target.origin],
+    normal: [...target.normal],
+    u: [...target.u],
+    v: [...target.v],
+    preview: target.preview ? {
+      bounds: cloneBounds2(target.preview.bounds),
+      studCenters: target.preview.studCenters.map((center) => [...center]),
+      patternDepth: target.preview.patternDepth,
+      center: [...target.preview.center]
+    } : null
   };
 }
 

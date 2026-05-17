@@ -192,6 +192,101 @@ test("uses wall-rib fallback when full anti-stud rings do not fit", async ({ pag
     .toBeLessThan(0.35);
 });
 
+test("adds raised stud grids to multiple selected flat planes without cutting the mesh", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => window.__everythingABrick?.getState().sourceLoaded);
+
+  await page.setInputFiles("#stlFile", {
+    name: "mount-box.stl",
+    mimeType: "model/stl",
+    buffer: tinyBoxStlBuffer(64, 64, 32)
+  });
+  await expect(page.locator("#modelTitle")).toHaveText("mount-box");
+
+  await page.getByRole("button", { name: "Stud Planes" }).click();
+  await expect(page.getByRole("button", { name: "Stud Planes" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Cut Mounts" })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByRole("button", { name: "Add Stud Pattern" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Move Plane" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Rotate Plane" })).toBeHidden();
+
+  const source = await page.evaluate(() => window.__everythingABrick.getState().sourceBounds);
+
+  await page.evaluate((bounds) => window.__everythingABrick.setCamera({
+    position: [0, -80, bounds.max[2] + 96],
+    target: [0, 0, bounds.max[2]]
+  }), source);
+  await clickCanvasCenter(page);
+  await expect(page.getByTestId("brickify-status")).toContainText(/Added stud plane 1/);
+
+  const afterTop = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(afterTop.operationMode).toBe("studs");
+  expect(afterTop.studTargets).toHaveLength(1);
+  expect(afterTop.studTargets[0].origin[2]).toBeCloseTo(source.max[2], 1);
+  expect(afterTop.studTargets[0].normal[2]).toBeGreaterThan(0.95);
+  expect(afterTop.studTargets[0].preview.studCenters.length).toBeGreaterThan(4);
+  expect(centerKeys(afterTop.studTargets[0].preview.studCenters)).toContain("0.00,0.00");
+
+  await clickCanvasAt(page, 0.58, 0.5);
+  await expect(page.getByTestId("brickify-status")).toContainText(/Moved stud center for plane 1/);
+  const afterTopMove = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(afterTopMove.studTargets).toHaveLength(1);
+  expect(afterTopMove.studTargets[0].origin[2]).toBeCloseTo(source.max[2], 1);
+  expect(distance3(afterTopMove.studTargets[0].origin, afterTop.studTargets[0].origin)).toBeGreaterThan(1);
+
+  await page.evaluate((bounds) => window.__everythingABrick.setCamera({
+    position: [bounds.max[0] + 96, 0, (bounds.min[2] + bounds.max[2]) / 2],
+    target: [bounds.max[0], 0, (bounds.min[2] + bounds.max[2]) / 2]
+  }), source);
+  await clickCanvasCenter(page);
+  await expect(page.getByTestId("brickify-status")).toContainText(/Added stud plane 2/);
+  await expect(page.locator("#studPlaneList button")).toHaveCount(2);
+
+  const afterSide = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(afterSide.studTargets).toHaveLength(2);
+  expect(afterSide.studTargets[1].origin[0]).toBeCloseTo(source.max[0], 1);
+  expect(afterSide.studTargets[1].normal[0]).toBeGreaterThan(0.95);
+  expect(afterSide.studTargets[1].preview.studCenters.length).toBeGreaterThan(1);
+  await expect(page.getByRole("button", { name: "Delete Plane" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Clear Planes" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Add Stud Pattern" }).click();
+  await expect(page.getByTestId("brickify-status")).toContainText(/Generated \d+ raised studs/);
+
+  const result = await page.evaluate(() => window.__everythingABrick.getState());
+  expect(result.resultLoaded).toBe(true);
+  expect(result.splitInfo).toBeNull();
+  expect(result.studInfo.targets).toHaveLength(2);
+  expect(result.studInfo.totalStuds).toBe(
+    result.studInfo.targets.reduce((sum, target) => sum + target.studs, 0)
+  );
+  expect(result.resultPartBounds).toHaveLength(1);
+  expect(result.resultBounds.min[0]).toBeCloseTo(source.min[0], 1);
+  expect(result.resultBounds.min[1]).toBeCloseTo(source.min[1], 1);
+  expect(result.resultBounds.min[2]).toBeCloseTo(source.min[2], 1);
+  expect(result.resultBounds.max[0]).toBeGreaterThan(source.max[0] + result.dimensions.studHeight - 0.35);
+  expect(result.resultBounds.max[2]).toBeGreaterThan(source.max[2] + result.dimensions.studHeight - 0.35);
+  expect(result.resultBounds.max[1]).toBeCloseTo(source.max[1], 1);
+  expect(result.resultTriangles).toBeGreaterThan(result.sourceTriangles);
+  expect(result.downloadReady).toBe(true);
+
+  await expect(page.locator("#downloadLink")).toHaveAttribute("download", "mount-box-studded.stl");
+  const stlBounds = binaryStlBounds(await downloadBinaryStl(page));
+  expect(stlBounds.max[0]).toBeGreaterThan(source.max[0] + result.dimensions.studHeight - 0.35);
+  expect(stlBounds.max[2]).toBeGreaterThan(source.max[2] + result.dimensions.studHeight - 0.35);
+
+  const stlBytes = await downloadBinaryStl(page);
+  const topTarget = result.studInfo.targets[0];
+  const [topX, topY] = topTarget.origin;
+  const wallX = topX + result.dimensions.topStudRadius - result.dimensions.studWallThickness / 2;
+  const roundedOuterX = topX + result.dimensions.topStudRadius - result.dimensions.topStudEdgeRadius * 0.1;
+  expect(lastSolidZ(stlBytes, topX, topY)).toBeLessThan(source.max[2] + 0.35);
+  expect(lastSolidZ(stlBytes, wallX, topY))
+    .toBeGreaterThan(source.max[2] + result.dimensions.studHeight - 0.35);
+  expect(lastSolidZ(stlBytes, roundedOuterX, topY))
+    .toBeLessThan(source.max[2] + result.dimensions.studHeight - result.dimensions.topStudEdgeRadius * 0.25);
+});
+
 async function clickResultPart(page) {
   const canvas = page.locator("#brickCanvas");
   const box = await canvas.boundingBox();
@@ -221,12 +316,51 @@ async function clickResultPart(page) {
   expect(state.selectedResultIndex).not.toBeNull();
 }
 
+async function clickCanvasCenter(page) {
+  await clickCanvasAt(page, 0.5, 0.5);
+}
+
+async function clickCanvasAt(page, xRatio, yRatio) {
+  const canvas = page.locator("#brickCanvas");
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await canvas.click({
+    position: {
+      x: box.width * xRatio,
+      y: box.height * yRatio
+    }
+  });
+}
+
 async function downloadBinaryStl(page) {
   const bytes = await page.evaluate(async () => {
     const response = await fetch(document.querySelector("#downloadLink").href);
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });
   return Uint8Array.from(bytes);
+}
+
+function binaryStlBounds(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const triangleCount = view.getUint32(80, true);
+  const bounds = {
+    min: [Infinity, Infinity, Infinity],
+    max: [-Infinity, -Infinity, -Infinity]
+  };
+
+  for (let index = 0, offset = 84; index < triangleCount; index += 1, offset += 50) {
+    for (let vertex = 0; vertex < 3; vertex += 1) {
+      const base = offset + 12 + vertex * 12;
+      for (let axis = 0; axis < 3; axis += 1) {
+        const value = view.getFloat32(base + axis * 4, true);
+        bounds.min[axis] = Math.min(bounds.min[axis], value);
+        bounds.max[axis] = Math.max(bounds.max[axis], value);
+      }
+    }
+  }
+
+  return bounds;
 }
 
 function tinyBoxStlBuffer(width, depth, height) {
@@ -395,6 +529,17 @@ function sameGridValue(a, b) {
 }
 
 function firstSolidZ(bytes, x, y) {
+  const hits = zHitsAt(bytes, x, y);
+  return hits.find((hit, index) => index === 0 || Math.abs(hit - hits[index - 1]) > 0.05) ?? Infinity;
+}
+
+function lastSolidZ(bytes, x, y) {
+  const uniqueHits = zHitsAt(bytes, x, y)
+    .filter((hit, index, hits) => index === 0 || Math.abs(hit - hits[index - 1]) > 0.05);
+  return uniqueHits.at(-1) ?? -Infinity;
+}
+
+function zHitsAt(bytes, x, y) {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const triangleCount = view.getUint32(80, true);
   const hits = [];
@@ -431,7 +576,7 @@ function firstSolidZ(bytes, x, y) {
   }
 
   hits.sort((a, b) => a - b);
-  return hits.find((hit, index) => index === 0 || Math.abs(hit - hits[index - 1]) > 0.05) ?? Infinity;
+  return hits;
 }
 
 test("renders a nonblank preview and can switch between source and result", async ({ page }) => {
